@@ -279,12 +279,38 @@ ${news.map((n,i)=>`${i+1}. 原标题：${n.title}\n摘要：${n.summary}`).join(
 async function renderAll(news, kw){
   const results = await batchGen(news);
   let html='', pass=0;
+  
+  // 格式化时间函数
+  const formatDateTime = (dateStr) => {
+    if (!dateStr) return '时间未知';
+    try {
+      const date = new Date(dateStr);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    } catch {
+      return dateStr.slice(0, 19).replace('T', ' ');
+    }
+  };
+  
   results.forEach((item,i)=>{
     if(item.compliance !== 'block') pass++;
     const len = item.title.length;
+    const pubDate = news[i].pubDate || new Date().toISOString();
+    
     html += `<div class="card" id="card-${i}">
-      <div><strong>${escapeHtml(news[i].title)}</strong> <span class="tag tag-ok">${item.compliance==='block'?'已过滤':'合规'}</span></div>
-      <div class="source">来源：${news[i].source}</div>
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div><strong>${escapeHtml(news[i].title)}</strong> <span class="tag tag-ok">${item.compliance==='block'?'已过滤':'合规'}</span></div>
+        <div style="display:flex; gap:12px; align-items:center;">
+          <span style="font-size:12px; background:#f0f0f0; padding:2px 8px; border-radius:20px;">热度 ${news[i].hot || 0}</span>
+          <span style="font-size:12px; color:#888;">📅 ${formatDateTime(pubDate)}</span>
+        </div>
+      </div>
+      <div class="source">来源：${escapeHtml(news[i].source)}</div>
       <div class="summary">${escapeHtml(news[i].summary)}</div>
       ${item.compliance!=='block' ? `
       <div class="headline-box">
@@ -306,7 +332,8 @@ async function renderAll(news, kw){
       ` : `<div class="err">此条已过滤：${item.reason}</div>`}
     </div>`;
   });
-  document.getElementById('newsResults').innerHTML = html;
+  const resultsDiv = document.getElementById('newsResults');
+  if(resultsDiv) resultsDiv.innerHTML = html;
 }
 async function renderAll(news, kw){
   const results = await batchGen(news);
