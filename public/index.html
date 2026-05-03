@@ -465,24 +465,70 @@ async function genInitialHeadline(idx, item) {
   }
 }
 
-// 修改 regenOne 函数（兼容事件格式）
+// ========== 通用辅助函数 ==========
+function getItemData(i) {
+  // 优先从事件缓存读取
+  if (window.eventCache && window.eventCache[i]) {
+    return { item: window.eventCache[i], type: 'event' };
+  }
+  // 降级到新闻缓存
+  if (newsCache && newsCache[i]) {
+    return { item: newsCache[i], type: 'news' };
+  }
+  return null;
+}
+
+// 复制文案
+function copyIt(i) {
+  const title = document.getElementById(`ht-${i}`)?.innerText || '';
+  const hook = document.getElementById(`hs-${i}`)?.innerText || '';
+  navigator.clipboard.writeText(hook ? title + '\n' + hook : title);
+  alert('已复制头条文案');
+}
+
+// 复制全文
+function copyFullArticle(i) {
+  const len = document.getElementById(`lenSelect-${i}`)?.value;
+  if (!len) return;
+  const content = fullArticles[i]?.[len];
+  if (content) { 
+    navigator.clipboard.writeText(content); 
+    alert('已复制全文'); 
+  } else { 
+    alert('请先生成全文'); 
+  }
+}
+
+// 复制社评
+function copySheping(i) {
+  const len = document.getElementById(`shepLenSelect-${i}`)?.value;
+  if (!len) return;
+  const content = shepingCache[i]?.[len];
+  if (content) { 
+    navigator.clipboard.writeText(content); 
+    alert('已复制社评'); 
+  } else { 
+    alert('请先生成社评'); 
+  }
+}
+
+// 换一版
 async function regenOne(i) {
-  const item = window.eventCache ? window.eventCache[i] : (newsCache ? newsCache[i] : null);
-  if (!item) return;
+  const data = getItemData(i);
+  if (!data) {
+    console.error('未找到数据', i);
+    return;
+  }
+  const item = data.item;
+  const isEvent = data.type === 'event';
   
   const titleEl = document.getElementById(`ht-${i}`);
   const hookEl = document.getElementById(`hs-${i}`);
   if (!titleEl) return;
   titleEl.innerText = '生成中...';
   
-  const isEvent = item.articles !== undefined;
   const eventTitle = isEvent ? item.event : item.title;
-  let summaryText = '';
-  if (isEvent) {
-    summaryText = item.articles.map(a => a.title).join('；');
-  } else {
-    summaryText = item.summary || item.title;
-  }
+  const summaryText = isEvent ? item.articles.map(a => a.title).join('；') : (item.summary || item.title);
   
   const prompt = `${COMPLIANCE}\n风格：${styleGuide[curStyle]}\n重新生成头条文案(不同思路)：\n标题：${eventTitle}\n摘要：${summaryText}\n返回JSON {"title":"","hook":""}`;
   
@@ -490,7 +536,7 @@ async function regenOne(i) {
     const content = await callDS([{ role: 'user', content: prompt }], 400);
     const json = JSON.parse(content.match(/\{.*\}/s)[0]);
     titleEl.innerText = json.title || eventTitle.slice(0, 25);
-    hookEl.innerText = json.hook || '';
+    if (hookEl) hookEl.innerText = json.hook || '';
     const len = (json.title || '').length;
     const cc = document.getElementById(`cc-${i}`);
     if (cc) cc.innerText = `标题${len}字${len > 25 ? '超长' : ''}`;
@@ -504,18 +550,19 @@ async function regenOne(i) {
   } catch (e) {
     console.error('换一版失败:', e);
     titleEl.innerText = eventTitle.slice(0, 25);
-    hookEl.innerText = '';
+    if (hookEl) hookEl.innerText = '';
   }
 }
 
-// 修改 genFullArticle 函数（兼容事件格式）
+// 生成全文（改写报道）
 async function genFullArticle(i) {
-  // 优先从事件缓存读取，如果没有则从新闻缓存读取
-  const item = window.eventCache ? window.eventCache[i] : (newsCache ? newsCache[i] : null);
-  if (!item) {
+  const data = getItemData(i);
+  if (!data) {
     console.error('未找到数据', i);
     return;
   }
+  const item = data.item;
+  const isEvent = data.type === 'event';
   
   const lenSelect = document.getElementById(`lenSelect-${i}`);
   if (!lenSelect) return;
@@ -535,12 +582,9 @@ async function genFullArticle(i) {
   fullDiv.style.display = 'block';
   contentDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 重新编辑报道中...</div>';
   
-  // 判断是事件格式还是新闻格式
-  const isEvent = item.articles !== undefined;
   const eventTitle = isEvent ? item.event : item.title;
   const curTitle = document.getElementById(`ht-${i}`)?.innerText || eventTitle.slice(0, 25);
   
-  // 构建提示词
   let allTitles = '';
   if (isEvent) {
     allTitles = item.articles.map(a => a.title).join('\n');
@@ -564,11 +608,15 @@ async function genFullArticle(i) {
   }
 }
 
-// 修改 genSheping 函数（兼容事件格式）
+// 生成社评
 async function genSheping(i) {
-  // 优先从事件缓存读取
-  const item = window.eventCache ? window.eventCache[i] : (newsCache ? newsCache[i] : null);
-  if (!item) return;
+  const data = getItemData(i);
+  if (!data) {
+    console.error('未找到数据', i);
+    return;
+  }
+  const item = data.item;
+  const isEvent = data.type === 'event';
   
   const lenSelect = document.getElementById(`shepLenSelect-${i}`);
   if (!lenSelect) return;
@@ -583,10 +631,10 @@ async function genSheping(i) {
     shepDiv.style.display = 'block';
     return;
   }
+  
   shepDiv.style.display = 'block';
   contentDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 撰写社评...</div>';
   
-  const isEvent = item.articles !== undefined;
   const eventTitle = isEvent ? item.event : item.title;
   const curTitle = document.getElementById(`ht-${i}`)?.innerText || eventTitle.slice(0, 25);
   
@@ -611,16 +659,6 @@ async function genSheping(i) {
   }
 }
 
-// copyIt 保持不变
-function copyIt(i) {
-  const title = document.getElementById(`ht-${i}`)?.innerText || '';
-  const hook = document.getElementById(`hs-${i}`)?.innerText || '';
-  navigator.clipboard.writeText(hook ? title + '\n' + hook : title);
-  alert('已复制头条文案');
-}
-
-
-
 
 
 // 辅助函数：复制文本
@@ -639,57 +677,45 @@ function removeAiTone(text) {
              .trim();
 }
 
-async function startNews(){
+async function startNews() {
   const kw = document.getElementById('kwInput').value.trim();
   const topic = document.getElementById('topicSel').value;
   const resultsDiv = document.getElementById('newsResults');
-  if(!resultsDiv) return;
+  if (!resultsDiv) return;
 
   resultsDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 抓取热点事件中...</div>';
 
-  try{
-    const data = await fetchNews(topic, kw, 10);
+  try {
+    const params = new URLSearchParams({ topic, kw: kw || topic, limit: '10' });
+    const res = await fetch('/api/news?' + params);
+    const data = await res.json();
     
-    let events = [];
     if (data.events && data.events.length > 0) {
-      events = data.events;
+      // 事件模式
+      window.eventCache = data.events;
+      newsCache = [];  // 清空新闻缓存
+      fullArticles = {};
+      shepingCache = {};
+      await renderAllEvents(data.events, kw || topic);
     } else if (data.news && data.news.length > 0) {
-      // 将新闻格式转换为事件格式
-      events = data.news.map(n => ({
-        event: n.title,
-        heat: n.hot || 50,
-        count: 1,
-        articles: [{ ...n, pubDate: n.pubDate || new Date().toISOString() }],
-        pubDate: n.pubDate || new Date().toISOString()
-      }));
+      // 新闻模式（降级）
+      let news = cleanNewsData(data.news);
+      newsCache = news;
+      window.eventCache = null;
+      fullArticles = {};
+      shepingCache = {};
+      await renderAll(news, kw || topic);
+    } else {
+      // 兜底
+      const fallbackNews = getFallbackNews(topic, kw);
+      newsCache = fallbackNews;
+      await renderAll(fallbackNews, kw || topic);
     }
-    
-    if (events.length === 0) {
-      events = [{
-        event: `暂无“${kw || topic}”相关热点`,
-        heat: 0,
-        count: 1,
-        articles: [{ title: '请尝试其他关键词', summary: '', source: '系统', pubDate: new Date().toISOString() }],
-        pubDate: new Date().toISOString()
-      }];
-    }
-    
-    window.eventCache = events;
-    fullArticles = {};
-    shepingCache = {};
-    await renderAllEvents(events, kw || topic);
-
-  }catch(e){
+  } catch (e) {
     console.error(e);
-    const fallbackEvents = [{
-      event: `热点加载中，请稍后重试`,
-      heat: 0,
-      count: 1,
-      articles: [{ title: '网络异常或暂无数据', summary: '请刷新页面或稍后再试', source: '系统', pubDate: new Date().toISOString() }],
-      pubDate: new Date().toISOString()
-    }];
-    window.eventCache = fallbackEvents;
-    await renderAllEvents(fallbackEvents, kw || topic);
+    const fallbackNews = getFallbackNews(topic, kw);
+    newsCache = fallbackNews;
+    await renderAll(fallbackNews, kw || topic);
   }
 }
 
@@ -817,17 +843,7 @@ async function genSheping(i){
   }
 }
 
-function copyFullArticle(i) {
-  const len = document.getElementById(`lenSelect-${i}`)?.value;
-  if (!len) return;
-  const content = fullArticles[i]?.[len];
-  if (content) { 
-    navigator.clipboard.writeText(content); 
-    alert('已复制全文'); 
-  } else { 
-    alert('请先生成全文'); 
-  }
-}
+
 function removeAiTone(text){
   return text
     // 删除典型AI新闻腔
@@ -847,23 +863,7 @@ function removeAiTone(text){
     .replace(/\n{3,}/g,'\n\n')
     .trim();
 }
-function copySheping(i) {
-  const len = document.getElementById(`shepLenSelect-${i}`)?.value;
-  if (!len) return;
-  const content = shepingCache[i]?.[len];
-  if (content) { 
-    navigator.clipboard.writeText(content); 
-    alert('已复制社评'); 
-  } else { 
-    alert('请先生成社评'); 
-  }
-}
-function copyIt(i){
-  const title = document.getElementById(`ht-${i}`)?.innerText || '';
-  const hook = document.getElementById(`hs-${i}`)?.innerText || '';
-  navigator.clipboard.writeText(hook ? title+'\n'+hook : title);
-  alert('已复制头条文案');
-}
+
 
 // 自定义社评
 async function generateCustomSheping(){
