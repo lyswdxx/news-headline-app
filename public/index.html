@@ -103,20 +103,22 @@ select,input[type=text]{height:38px;border:1px solid #ddd;border-radius:8px;padd
     <div id="newsResults"><div class="empty">选择分类或输入关键词，点击获取</div></div>
   </div>
 
-  <!-- 视频模式 -->
-  <div id="videoPanel" class="panel" style="display:none">
-    <div class="row">
-      <select id="videoRegion">
-        <option value="US">YouTube 全球热门</option>
-        <option value="JP">日本热门</option>
-        <option value="KR">韩国热门</option>
-        <option value="GB">英国热门</option>
-      </select>
-      <button class="btn-go" id="goVideoBtn">获取视频元数据</button>
-    </div>
-    <div class="notice">只获取标题、频道、链接等，不下载文件。点击“生成介绍文”可撰写发布文案。</div>
-    <div id="videoResults"><div class="empty">点击上方按钮获取最新热门视频</div></div>
-  </div>
+
+	<!-- 视频模式 -->
+	<div id="videoPanel" class="panel" style="display:none">
+	  <div class="row">
+		<select id="videoRegion">
+		  <option value="US">YouTube 全球热门</option>
+		  <option value="JP">日本热门</option>
+		  <option value="KR">韩国热门</option>
+		  <option value="GB">英国热门</option>
+		</select>
+		<input type="text" id="videoKwInput" placeholder="输入关键词搜索视频，如：五一旅游、新能源车" style="flex:1"/>
+		<button class="btn-go" id="goVideoBtn">获取视频</button>
+	  </div>
+	  <div class="notice">可选择地区或输入关键词搜索视频，点击“生成介绍文”可撰写发布文案。</div>
+	  <div id="videoResults"><div class="empty">选择地区或输入关键词，点击获取</div></div>
+	</div>
 
   <!-- 自定义社评区 -->
   <div class="custom-sheping">
@@ -699,11 +701,16 @@ async function renderVideos(videos){
 }
 async function loadVideos(){
   const region = document.getElementById('videoRegion').value;
+  const kw = document.getElementById('videoKwInput')?.value.trim() || '';
   const container = document.getElementById('videoResults');
   if(!container) return;
-  container.innerHTML = '<div class="loading"><span class="spinner"></span> 获取中...</div>';
+  container.innerHTML = '<div class="loading"><span class="spinner"></span> 搜索视频中...</div>';
   try{
-    const videos = await fetchVideos(region);
+    let url = `/api/video?region=${region}`;
+    if (kw) url += `&kw=${encodeURIComponent(kw)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const videos = data.videos || [];
     await renderVideos(videos);
   }catch(e){
     container.innerHTML = `<div class="err">获取失败: ${e.message}</div>`;
