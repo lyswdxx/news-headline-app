@@ -1,5 +1,5 @@
 // ==========================================
-// 视频热点接口 - 支持关键词搜索
+// 视频热点接口 - 支持关键词搜索 + 真实链接
 // ==========================================
 
 const INVIDIOUS_INSTANCES = [
@@ -8,26 +8,12 @@ const INVIDIOUS_INSTANCES = [
   'https://invidious.snopyta.org'
 ];
 
-// 兴趣词映射（根据分类推荐相关视频）
-const CATEGORY_KEYWORDS = {
-  '科技': 'technology',
-  '财经': 'finance',
-  '人工智能': 'artificial intelligence',
-  '体育': 'sports',
-  '健康': 'health',
-  '社会民生': 'news',
-  '汽车': 'car',
-  '教育': 'education',
-  '娱乐': 'entertainment',
-  '旅游': 'travel'
-};
-
 function cleanText(str) {
   if (!str) return '';
   return str.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
 
-// 搜索 YouTube 视频（通过 Invidious）
+// 搜索 YouTube 视频
 async function searchYouTube(query, limit = 10) {
   if (!query) return [];
   
@@ -47,7 +33,7 @@ async function searchYouTube(query, limit = 10) {
       if (Array.isArray(data) && data.length > 0) {
         return data.filter(v => v.type === 'video').slice(0, limit).map(v => ({
           title: cleanText(v.title).slice(0, 80),
-          link: `https://youtube.com/watch?v=${v.videoId}`,
+          link: `https://www.youtube.com/watch?v=${v.videoId}`,
           channel: cleanText(v.author).slice(0, 50) || 'YouTube频道',
           published: v.publishedText || new Date().toISOString(),
           description: cleanText(v.description || '').slice(0, 200),
@@ -61,7 +47,7 @@ async function searchYouTube(query, limit = 10) {
   return [];
 }
 
-// 获取热门视频（无关键词时）
+// 获取热门视频
 async function fetchTrending(region) {
   const regionMap = { US: 'US', JP: 'JP', KR: 'KR', GB: 'GB' };
   const code = regionMap[region] || 'US';
@@ -82,7 +68,7 @@ async function fetchTrending(region) {
       if (Array.isArray(data) && data.length > 0) {
         return data.slice(0, 12).map(v => ({
           title: cleanText(v.title).slice(0, 80),
-          link: `https://youtube.com/watch?v=${v.videoId}`,
+          link: `https://www.youtube.com/watch?v=${v.videoId}`,
           channel: cleanText(v.author).slice(0, 50) || 'YouTube频道',
           published: v.publishedText || new Date().toISOString(),
           description: cleanText(v.description || '').slice(0, 200),
@@ -96,65 +82,43 @@ async function fetchTrending(region) {
   return [];
 }
 
-// 兜底数据（根据关键词生成）
+// 生成兜底数据（带真实搜索链接）
 function getFallbackVideos(keyword, region) {
   const kw = keyword || region || '热点';
-  const videos = [];
+  const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(kw)}`;
   
-  // 根据关键词生成相关视频标题
-  const titles = [
-    `${kw}最新动态，全网都在看`,
-    `${kw}深度解析，专家这样说`,
-    `${kw}背后的真相，太震撼了`,
-    `${kw}现场实拍，太真实了`,
-    `${kw}干货分享，建议收藏`
+  return [
+    { title: `${kw} 最新热门视频合集`, link: searchUrl, channel: 'YouTube精选', published: new Date().toISOString(), description: `关于“${kw}”的最新热门视频，点击观看。`, thumbnail: '' },
+    { title: `${kw} 深度解析`, link: searchUrl, channel: '知识科普', published: new Date().toISOString(), description: `专家解读“${kw}”背后的真相。`, thumbnail: '' },
+    { title: `${kw} 现场实拍`, link: searchUrl, channel: '现场直击', published: new Date().toISOString(), description: `第一视角记录“${kw}”真实场景。`, thumbnail: '' },
+    { title: `${kw} 干货分享`, link: searchUrl, channel: '实用教程', published: new Date().toISOString(), description: `关于“${kw}”的实用技巧，建议收藏。`, thumbnail: '' },
+    { title: `${kw} 最新进展`, link: searchUrl, channel: '新闻速递', published: new Date().toISOString(), description: `“${kw}”最新动态，第一时间了解。`, thumbnail: '' }
   ];
-  
-  for (let i = 0; i < Math.min(5, titles.length); i++) {
-    videos.push({
-      title: titles[i],
-      link: '#',
-      channel: `${kw}频道`,
-      published: new Date().toISOString(),
-      description: `关于“${kw}”的最新视频，点击观看完整内容。`,
-      thumbnail: ''
-    });
-  }
-  return videos;
 }
 
-// API 入口
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  const { region = 'US', kw, topic } = req.query;
+  const { region = 'US', kw } = req.query;
   
   try {
     let videos = [];
     
-    // 优先级1：用户输入的关键词
-    if (kw && kw.trim()) {
+    // 1. 关键词搜索
+    if (kw && kw.trim() && kw !== 'undefined') {
       videos = await searchYouTube(kw.trim());
       if (videos.length > 0) {
         return res.status(200).json({ videos: videos.slice(0, 8) });
       }
     }
     
-    // 优先级2：分类关键词（没有用户输入时）
-    if (topic && CATEGORY_KEYWORDS[topic]) {
-      videos = await searchYouTube(CATEGORY_KEYWORDS[topic]);
-      if (videos.length > 0) {
-        return res.status(200).json({ videos: videos.slice(0, 8) });
-      }
-    }
-    
-    // 优先级3：地区热门视频
+    // 2. 地区热门
     videos = await fetchTrending(region);
     if (videos.length > 0) {
       return res.status(200).json({ videos: videos.slice(0, 8) });
     }
     
-    // 优先级4：兜底数据
-    const searchKw = kw || topic || region;
+    // 3. 兜底（带搜索链接）
+    const searchKw = kw || region;
     const fallback = getFallbackVideos(searchKw, region);
     res.status(200).json({ videos: fallback });
     
