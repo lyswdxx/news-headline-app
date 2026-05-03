@@ -1,65 +1,65 @@
 // ==========================================
-// 热点新闻接口 - VVHAN 免费热榜（无需 Key）
+// 天行 API 聚合接口（热点、国内、旅游、AI、互联网、IT、花边、区域、科技探针）
 // ==========================================
 
-const VVHAN_HOT_API = 'https://api.vvhan.com/api/hotlist';
+const API_BASE = 'https://apis.tianapi.com';
+const apiKey = process.env.TIAN_API_KEY;
 
-// 分类映射（VVHAN 支持的热榜类型）
-const CATEGORY_MAP = {
-  科技: '36kr',         // 36氪热榜
-  财经: 'zhihu',        // 知乎热榜（含财经话题）
-  人工智能: 'zhihu',    // 知乎热榜
-  体育: 'zhihu',
-  健康: 'zhihu',
-  社会民生: 'weibo',    // 微博热搜
-  汽车: 'zhihu',
-  教育: 'zhihu',
-  娱乐: 'weibo',        // 微博热搜
+// 分类 → 接口路径 映射表
+const CATEGORY_API = {
+  科技: '/it/index',         // IT 资讯
+  财经: '/internet/index',    // 互联网（含财经热点）
+  人工智能: '/ai/index',      // 人工智能
+  体育: '/internet/index',    // 互联网（体育话题也包含）
+  健康: '/internet/index',
+  社会民生: '/guonei/index',  // 国内新闻
+  汽车: '/internet/index',
+  教育: '/internet/index',
+  娱乐: '/huabian/index',     // 花边新闻
+  旅游: '/travel/index',      // 旅游资讯
+  区域: '/areanews/index',    // 区域新闻
+  科技探针: '/sicprobe/index',// 科技探针
 };
 
-async function fetchHotNews(category = 'weibo') {
+// 默认接口（国内新闻）
+const DEFAULT_API = '/guonei/index';
+
+// 调用天行 API
+async function fetchTianApi(apiPath, num = 12) {
+  if (!apiKey) {
+    console.error('未配置 TIAN_API_KEY');
+    return [];
+  }
   try {
+    const url = `${API_BASE}${apiPath}?key=${apiKey}&num=${num}`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(VVHAN_HOT_API, {
+    const res = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
       signal: controller.signal,
     });
     clearTimeout(timeout);
     if (!res.ok) return [];
-
     const data = await res.json();
-    if (!data.success || !data.data) return [];
-
-    // 根据分类选择热榜源
-    const sourceKey = CATEGORY_MAP[category] || 'weibo';
-    let hotList = [];
-
-    if (sourceKey === 'weibo' && data.data.weibo) {
-      hotList = data.data.weibo;
-    } else if (sourceKey === 'zhihu' && data.data.zhihu) {
-      hotList = data.data.zhihu;
-    } else if (sourceKey === '36kr' && data.data['36kr']) {
-      hotList = data.data['36kr'];
-    } else {
-      // 默认取微博热搜
-      hotList = data.data.weibo || [];
+    if (data.code !== 200) {
+      console.error(`天行 API 错误 [${apiPath}]:`, data.msg);
+      return [];
     }
-
-    return hotList.slice(0, 12).map(item => ({
+    // 转换为前端需要的格式
+    return data.newslist.map(item => ({
       title: item.title,
-      summary: `热度值 ${item.hot || '正在热议'}，网友讨论激烈。`,
-      source: sourceKey === 'weibo' ? '微博热搜' : (sourceKey === 'zhihu' ? '知乎热榜' : '36氪热榜'),
-      hot: item.hot,
-      link: item.url || '#',
+      summary: item.description || item.content || '暂无摘要',
+      source: item.source || '天行数据',
+      hot: item.hot || '',
+      link: item.url || '',
     }));
   } catch (err) {
-    console.error('VVHAN 热榜抓取失败:', err);
+    console.error(`天行 API 抓取失败 [${apiPath}]:`, err.message);
     return [];
   }
 }
 
-// Google 搜索备用（当用户输入关键词时）
+// Google 新闻搜索（用户输入关键词时使用）
 function getSearchUrl(keyword) {
   return `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
 }
@@ -76,7 +76,7 @@ async function fetchSearchFeed(keyword) {
     if (!res.ok) return [];
     const xml = await res.text();
     const blocks = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
-    return blocks.slice(0, 6).map(block => {
+    return blocks.slice(0, 8).map(block => {
       let title = block.match(/<title>([\s\S]*?)<\/title>/)?.[1] || '';
       let summary = block.match(/<description>([\s\S]*?)<\/description>/)?.[1] || '';
       title = cleanText(title);
@@ -115,13 +115,14 @@ export default async function handler(req, res) {
     }
   }
 
-  // 2. 获取热榜（根据分类，默认微博热搜）
-  const hotNews = await fetchHotNews(topic);
+  // 2. 根据分类调用对应的天行 API
+  const apiPath = CATEGORY_API[topic] || DEFAULT_API;
+  const hotNews = await fetchTianApi(apiPath);
   if (hotNews.length >= 3) {
     return res.status(200).json({ news: hotNews.slice(0, 6) });
   }
 
-  // 3. 终极兜底
+  // 3. 终极兜底（保证永远有数据返回）
   const fallback = fallbackNews(topic || kw || '热门');
   res.status(200).json({ news: fallback });
 }
