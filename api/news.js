@@ -22,7 +22,22 @@ async function fetchFeed(url){
   for(let block of blocks.slice(0,8)){
     let title = (block.match(/<title>([\s\S]*?)<\/title>/)?.[1] || '');
     let summary = (block.match(/<description>([\s\S]*?)<\/description>/)?.[1] || block.match(/<summary>([\s\S]*?)<\/summary>/)?.[1] || '');
-    if(title) items.push({ title: stripHtml(title).slice(0,80), summary: stripHtml(summary).slice(0,200), source: url.split('/')[2] });
+    
+    // 清理 HTML 标签
+    title = stripHtml(title);
+    summary = stripHtml(summary);
+    
+    // 过滤常见的推广文案（爱范儿等）
+    summary = summary.replace(/欢迎关注.*?微信公众号.*?（微信号：.*?）。*$/g, '')
+                     .replace(/更多精彩内容.*$/g, '')
+                     .replace(/第一时间为您奉上.*$/g, '')
+                     .trim();
+    
+    if(title) items.push({ 
+      title: title.slice(0,80), 
+      summary: summary.slice(0,200), 
+      source: url.split('/')[2] 
+    });
   }
   return items;
 }
