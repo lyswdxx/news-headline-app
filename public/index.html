@@ -284,7 +284,7 @@ async function renderAll(news, kw){
     const len = item.title.length;
     html += `<div class="card" id="card-${i}">
       <div><strong>${escapeHtml(news[i].title)}</strong> <span class="tag tag-ok">${item.compliance==='block'?'已过滤':'合规'}</span></div>
-      <div class="source">来源：${news[i].source}</div>
+      <div class="source">来源：${news[i].source} <span style="color:#aaa;">${formatDateTime(news[i].pubDate)}</span></div>
       <div class="summary">${escapeHtml(news[i].summary)}</div>
       ${item.compliance!=='block' ? `
       <div class="headline-box">
@@ -311,31 +311,31 @@ async function renderAll(news, kw){
 async function renderAllEvents(events, kw) {
   let html = '';
   
+  // 格式化具体时间函数
+	const formatDateTime = (dateStr) => {
+	  if (!dateStr) return '时间未知';
+	  try {
+		const date = new Date(dateStr);
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		const hours = String(date.getHours()).padStart(2, '0');
+		const minutes = String(date.getMinutes()).padStart(2, '0');
+		return `${year}-${month}-${day} ${hours}:${minutes}`;
+	  } catch {
+		return dateStr.slice(0, 16).replace('T', ' ');
+	  }
+	};
+  
   events.forEach((e, i) => {
     const heatLevel = e.heat > 100 ? '🔥🔥🔥' : (e.heat > 50 ? '🔥🔥' : '🔥');
-    // 格式化日期显示
-    const formatDate = (dateStr) => {
-      if (!dateStr) return '刚刚';
-      try {
-        const date = new Date(dateStr);
-        const now = new Date();
-        const diff = Math.floor((now - date) / 1000 / 60); // 分钟差
-        if (diff < 1) return '刚刚';
-        if (diff < 60) return `${diff}分钟前`;
-        if (diff < 1440) return `${Math.floor(diff / 60)}小时前`;
-        return `${Math.floor(diff / 1440)}天前`;
-      } catch {
-        return dateStr.slice(0, 10);
-      }
-    };
-    
     html += `
       <div class="card" id="event-card-${i}">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
           <strong style="font-size:16px;">${heatLevel} ${escapeHtml(e.event)}</strong>
           <div style="display:flex; gap:12px; align-items:center;">
             <span style="font-size:12px; background:#f0f0f0; padding:2px 8px; border-radius:20px;">热度 ${e.heat}</span>
-            <span style="font-size:12px; color:#888;">📅 ${formatDate(e.pubDate)}</span>
+            <span style="font-size:12px; color:#888;">📅 ${formatDateTime(e.pubDate)}</span>
           </div>
         </div>
         
@@ -344,7 +344,7 @@ async function renderAllEvents(events, kw) {
         </div>
         
         <div style="margin-top:8px; font-size:13px; color:#555; background:#f9f9f9; padding:8px; border-radius:8px; max-height:150px; overflow-y:auto;">
-          ${e.articles.map(a => `• ${escapeHtml(a.title)} <span style="color:#aaa; font-size:11px;">(${formatDate(a.pubDate)})</span>`).join('<br>')}
+          ${e.articles.map(a => `• ${escapeHtml(a.title)} <span style="color:#aaa; font-size:11px;">(${formatDateTime(a.pubDate)})</span>`).join('<br>')}
         </div>
         
         <div class="actions" style="margin-top:12px;">
