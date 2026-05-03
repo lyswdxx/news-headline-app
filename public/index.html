@@ -211,9 +211,27 @@ function fallbackTitle(n){ let t=n.title; return t.length>25? t.slice(0,22)+'...
 function fallbackHook(n){ let h=n.summary; return h.length>40? h.slice(0,37)+'...' : (h||'点击了解'); }
 
 async function batchGen(news){
-  const prompt = `${COMPLIANCE}\n当前风格：${styleGuide[curStyle]}\n对以下每条新闻合规审核并生成头条文案(标题≤25字, 导语≤40字)。返回JSON数组：[{"compliance":"pass/block","reason":"","title":"","hook":""}]\n新闻:\n${news.map((n,i)=>`${i+1}.标题：${n.title}\n摘要：${n.summary}`).join('\n')}`;
+  // 新增：热度改写指令
+  const heatPrompt = `你是一个深谙流量密码的资深标题党编辑，擅长把普通新闻改写成“容易上热门、引发互动”的爆款文案。
+
+【核心要求】
+1. 标题必须 ≤25字，但要有情绪、有冲突、有悬念或实用价值。
+2. 禁止使用“震惊”“炸了”“疯传”等违规词，但可以用“居然”“揭秘”“千万不要”“本地人才知道”等吸睛词。
+3. 导语（hook）要在 40 字内制造好奇或共鸣，例如：“网友吵翻了”“很多人还不知道”“看完想立刻出发”。
+4. 内容必须基于原文事实，不编造虚假信息。
+5. 整体风格类似微博热搜、微信公众号爆款文，让人忍不住点进去。
+
+你现在的任务：把下面这些新闻，一条一条改写成上述风格的“头条文案”。
+返回 JSON 数组，格式：[{"compliance":"pass/block","reason":"","title":"改写的爆款标题","hook":"吸睛导语"}]
+如果新闻政治敏感（compliance=block），则 title 和 hook 留空。
+
+新闻列表：
+${news.map((n,i)=>`${i+1}. 原标题：${n.title}\n摘要：${n.summary}`).join('\n')}
+
+请直接输出 JSON 数组，不要用 markdown 代码块。`;
+
   try {
-    const content = await callDS([{role:'user',content:prompt}], 1500);
+    const content = await callDS([{role:'user',content:heatPrompt}], 1500);
     let jsonStr = content.match(/\[[\s\S]*\]/)?.[0] || content;
     let parsed = JSON.parse(jsonStr);
     if(!Array.isArray(parsed)) throw new Error();
