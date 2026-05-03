@@ -1,81 +1,199 @@
-async function renderAll(events, kw) {
-  let html = '';
-  window.eventCache = events; // 缓存供生成文章使用
-  
-  events.forEach((e, i) => {
-    html += `
-      <div class="card" id="event-card-${i}">
-        <div><strong>🔥 ${escapeHtml(e.event)}</strong></div>
-        <div style="margin:8px 0; font-size:12px; color:#888;">
-          热度值 ${e.heat} ｜ 相关新闻 ${e.count} 条
-        </div>
-        <div style="margin-top:8px; font-size:13px; color:#555; background:#f9f9f9; padding:8px; border-radius:8px;">
-          ${e.articles.map(a => `• ${escapeHtml(a.title)}`).join('<br>')}
-        </div>
-        <div class="actions" style="margin-top:12px;">
-          <button class="btn-sm" onclick="genFromEvent(${i})">📝 生成本文</button>
-          <button class="btn-sm" onclick="genShepingFromEvent(${i})">📢 生成社评</button>
-        </div>
-        <div id="event-article-${i}" class="hot-article" style="display:none; margin-top:12px;"></div>
-        <div id="event-sheping-${i}" class="hot-article" style="display:none; margin-top:12px;"></div>
-      </div>
-    `;
-  });
-  
-  document.getElementById('newsResults').innerHTML = html;
+// ==========================================
+// 商业级热点聚合接口（多源 + 去重 + 聚类 + 热度排序）
+// ==========================================
+
+const API_BASE = 'https://apis.tianapi.com';
+const apiKey = process.env.TIAN_API_KEY;
+const VVHAN_API = 'https://api.vvhan.com/api/hotlist';
+
+// 分类映射
+const CATEGORY_API = {
+  科技: '/it/index',
+  财经: '/internet/index',
+  人工智能: '/ai/index',
+  体育: '/internet/index',
+  健康: '/internet/index',
+  社会民生: '/guonei/index',
+  汽车: '/internet/index',
+  教育: '/internet/index',
+  娱乐: '/huabian/index',
+  旅游: '/travel/index',
+};
+const DEFAULT_API = '/guonei/index';
+
+// ========== 1. 通用清洗函数 ==========
+function cleanText(str) {
+  if (!str) return '';
+  let text = str;
+  text = text.replace(/&lt;/g, '<')
+             .replace(/&gt;/g, '>')
+             .replace(/&amp;/g, '&')
+             .replace(/&quot;/g, '"')
+             .replace(/&#39;/g, "'")
+             .replace(/&nbsp;/g, ' ')
+             .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)));
+  text = text.replace(/<[^>]*>/g, ' ');
+  text = text.replace(/<!\[CDATA\[|\]\]>/g, '');
+  text = text.replace(/\s+/g, ' ').trim();
+  text = text.replace(/欢迎关注.*?微信公众号.*?（微信号：.*?）。*$/g, '')
+             .replace(/更多精彩内容.*$/g, '')
+             .replace(/第一时间为您奉上.*$/g, '');
+  return text;
 }
 
-// 基于事件生成文章（去AI味）
-async function genFromEvent(index) {
-  const event = window.eventCache[index];
-  if (!event) return;
-  const container = document.getElementById(`event-article-${index}`);
-  container.style.display = 'block';
-  container.innerHTML = '<div class="loading"><span class="spinner"></span> 基于多源事件撰写中...</div>';
-  
-  const titles = event.articles.map(a => a.title).join('\n');
-  const prompt = `根据以下多条新闻，写一篇通俗易懂、像人写的文章（600字左右），不要新闻腔，不要“首先其次”，不要AI痕迹，可以带一点个人观点但不夸张。\n\n${titles}`;
-  
+// ========== 2. 多源数据采集 ==========
+// Google 新闻
+async function fetchGoogleNews(keyword) {
+  if (!keyword) return [];
   try {
-    const article = await callDS([{ role: 'user', content: prompt }], 1200);
-    const cleaned = removeAiTone(article);
-    container.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(cleaned)}</div><button class="btn-sm" onclick="copyText(this, '${escapeHtml(cleaned).replace(/'/g, "\\'")}')">复制全文</button>`;
-  } catch (err) {
-    container.innerHTML = `<div class="err">生成失败：${err.message}</div>`;
-  }
+    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (!res.ok) return [];
+    const xml = await res.text();
+    const blocks = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
+    return blocks.slice(0, 10).map(block => {
+      let title = block.match(/<title>([\s\S]*?)<\/title>/)?.[1] || '';
+      let summary = block.match(/<description>([\s\S]*?)<\/description>/)?.[1] || '';
+      title = cleanText(title);
+      summary = cleanText(summary);
+      if (!title) return null;
+      return { title: title.slice(0, 80), summary: summary.slice(0, 150), source: 'Google新闻', hot: 0 };
+    }).filter(Boolean);
+  } catch { return []; }
 }
 
-// 基于事件生成社评
-async function genShepingFromEvent(index) {
-  const event = window.eventCache[index];
-  if (!event) return;
-  const container = document.getElementById(`event-sheping-${index}`);
-  container.style.display = 'block';
-  container.innerHTML = '<div class="loading"><span class="spinner"></span> 撰写社评中...</div>';
-  
-  const titles = event.articles.map(a => a.title).join('\n');
-  const prompt = `根据以下热点事件，写一篇300字左右的短评，观点积极，符合主流价值观，不要AI腔。\n\n${titles}`;
-  
+// 天行 API
+async function fetchTianApi(apiPath) {
+  if (!apiKey) return [];
   try {
-    const article = await callDS([{ role: 'user', content: prompt }], 800);
-    container.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(article)}</div><button class="btn-sm" onclick="copyText(this, '${escapeHtml(article).replace(/'/g, "\\'")}')">复制社评</button>`;
-  } catch (err) {
-    container.innerHTML = `<div class="err">生成失败：${err.message}</div>`;
+    const url = `${API_BASE}${apiPath}?key=${apiKey}&num=15`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (data.code !== 200) return [];
+    return data.newslist.map(item => ({
+      title: cleanText(item.title).slice(0, 80),
+      summary: cleanText(item.description || item.content || '').slice(0, 150),
+      source: item.source || '天行数据',
+      hot: parseInt(item.hot) || 0,
+    }));
+  } catch { return []; }
+}
+
+// VVHAN 热榜（微博/知乎/36kr）
+async function fetchVvhanHot(source = 'weibo') {
+  try {
+    const res = await fetch(VVHAN_API, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!data.success) return [];
+    let hotList = [];
+    if (source === 'weibo' && data.data.weibo) hotList = data.data.weibo;
+    else if (source === 'zhihu' && data.data.zhihu) hotList = data.data.zhihu;
+    else if (source === '36kr' && data.data['36kr']) hotList = data.data['36kr'];
+    else hotList = data.data.weibo || [];
+    return hotList.slice(0, 15).map(item => ({
+      title: cleanText(item.title).slice(0, 80),
+      summary: `热度值 ${item.hot || '飙升中'}，网友热议。`,
+      source: source === 'weibo' ? '微博热搜' : (source === 'zhihu' ? '知乎热榜' : '36氪热榜'),
+      hot: parseInt(item.hot) || 0,
+    }));
+  } catch { return []; }
+}
+
+// ========== 3. 去重（按标题前20字） ==========
+function dedupeNews(news) {
+  const map = new Map();
+  for (const n of news) {
+    const key = n.title.replace(/\s/g, '').slice(0, 20);
+    if (!map.has(key)) map.set(key, n);
   }
+  return Array.from(map.values());
 }
 
-// 辅助函数：复制文本
-function copyText(btn, text) {
-  navigator.clipboard.writeText(text);
-  const original = btn.innerText;
-  btn.innerText = '已复制 ✓';
-  setTimeout(() => btn.innerText = original, 1500);
+// ========== 4. 相似度算法 ==========
+function similarity(a, b) {
+  const s1 = a.replace(/\s/g, '');
+  const s2 = b.replace(/\s/g, '');
+  let same = 0;
+  for (const ch of s1) if (s2.includes(ch)) same++;
+  return same / Math.max(s1.length, s2.length);
 }
 
-// 去AI味函数（您已有的，如果没有则添加）
-function removeAiTone(text) {
-  return text.replace(/首先|其次|再者|综上所述|值得注意的是|从某种程度上/g, '')
-             .replace(/记者|编辑|业内人士/g, '')
-             .replace(/\n{3,}/g, '\n\n')
-             .trim();
+// ========== 5. 事件聚类 ==========
+function clusterNews(newsList) {
+  const groups = [];
+  for (const n of newsList) {
+    let found = false;
+    for (const g of groups) {
+      if (similarity(n.title, g[0].title) > 0.6) {
+        g.push(n);
+        found = true;
+        break;
+      }
+    }
+    if (!found) groups.push([n]);
+  }
+  return groups;
+}
+
+// ========== 6. 热度评分 ==========
+function calcScore(group) {
+  let score = group.length * 20;
+  for (const n of group) {
+    if (n.source?.includes('人民网') || n.source?.includes('微博')) score += 15;
+    else if (n.source?.includes('知乎')) score += 10;
+    else if (n.source?.includes('Google')) score += 5;
+    if (n.hot) score += Math.min(n.hot, 100);
+  }
+  return score;
+}
+
+// ========== 7. 主聚合函数 ==========
+async function aggregateEvents({ topic, kw }) {
+  let allNews = [];
+  const promises = [];
+
+  // 关键词搜索
+  if (kw && kw.trim()) promises.push(fetchGoogleNews(kw.trim()));
+  // 天行分类
+  const apiPath = CATEGORY_API[topic] || DEFAULT_API;
+  promises.push(fetchTianApi(apiPath));
+  // 热榜源
+  let hotSource = 'weibo';
+  if (topic === '科技') hotSource = '36kr';
+  else if (['财经', '人工智能', '体育', '健康', '汽车', '教育', '旅游'].includes(topic)) hotSource = 'zhihu';
+  promises.push(fetchVvhanHot(hotSource));
+
+  const results = await Promise.allSettled(promises);
+  for (const r of results) if (r.status === 'fulfilled' && r.value.length) allNews.push(...r.value);
+
+  if (allNews.length === 0) return [];
+
+  const deduped = dedupeNews(allNews);
+  const clusters = clusterNews(deduped);
+  const events = clusters.map(group => ({
+    event: group[0].title,
+    heat: calcScore(group),
+    count: group.length,
+    articles: group,
+  }));
+  events.sort((a, b) => b.heat - a.heat);
+  return events;
+}
+
+// ========== 8. API 入口 ==========
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const { topic, kw } = req.query;
+  try {
+    const events = await aggregateEvents({ topic, kw });
+    if (events.length === 0) {
+      return res.status(200).json({ events: [{ event: '暂无热点事件', heat: 0, count: 0, articles: [] }] });
+    }
+    res.status(200).json({ events: events.slice(0, 8) });
+  } catch (err) {
+    console.error('聚合失败:', err);
+    res.status(200).json({ events: [{ event: '热点加载中', heat: 0, count: 0, articles: [] }] });
+  }
 }
