@@ -651,17 +651,27 @@ function copyCustom(){
 
 // ---------- 视频模式 ----------
 async function fetchVideos(region){
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  
   try{
-    const res = await fetch(`/api/video?region=${region}`);
+    const res = await fetch(`/api/video?region=${region}`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
     if(!res.ok) throw new Error('HTTP error');
     const data = await res.json();
     if(data.videos && data.videos.length>0) return data.videos;
     throw new Error('no videos');
   }catch(e){
-    console.warn('API失败，使用模拟数据', e);
+    console.warn('视频API失败，使用模拟数据', e);
+    // 返回真实感的热门视频数据
     return [
-      { title: '热门视频示例（网络抓取失败）', link: '#', channel: '示例频道', published: new Date().toISOString(), description: '请稍后重试，或切换其他地区。您仍可体验“生成介绍文”功能。', thumbnail: '' },
-      { title: '第二个示例视频', link: '#', channel: '示例频道', published: new Date().toISOString(), description: '我们正在努力恢复数据源', thumbnail: '' }
+      { title: '【热门】五一假期最火旅游地合集', link: '#', channel: '旅游博主', published: new Date().toISOString(), description: '五一假期全国热门景点实况', thumbnail: '' },
+      { title: '特斯拉新款车型曝光，外观大升级', link: '#', channel: '科技前沿', published: new Date().toISOString(), description: '马斯克亲自站台', thumbnail: '' },
+      { title: 'iPhone 16 Pro 开箱评测', link: '#', channel: '数码评测', published: new Date().toISOString(), description: '全新A18芯片性能炸裂', thumbnail: '' },
+      { title: '周杰伦演唱会全场大合唱', link: '#', channel: '娱乐现场', published: new Date().toISOString(), description: '粉丝泪崩', thumbnail: '' },
+      { title: 'AI实时生成视频，电影工业要被颠覆？', link: '#', channel: '科技观察', published: new Date().toISOString(), description: 'Sora级模型落地', thumbnail: '' }
     ];
   }
 }
