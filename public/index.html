@@ -284,7 +284,7 @@ async function renderAll(news, kw){
     const len = item.title.length;
     html += `<div class="card" id="card-${i}">
       <div><strong>${escapeHtml(news[i].title)}</strong> <span class="tag tag-ok">${item.compliance==='block'?'已过滤':'合规'}</span></div>
-      <div class="source">来源：${news[i].source} <span style="color:#aaa;">${formatDateTime(news[i].pubDate)}</span></div>
+      <div class="source">来源：${news[i].source}</div>
       <div class="summary">${escapeHtml(news[i].summary)}</div>
       ${item.compliance!=='block' ? `
       <div class="headline-box">
