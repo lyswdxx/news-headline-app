@@ -120,11 +120,7 @@ const styleGuide = {
   analysis:'深度解读风格：剖析现象背后的原因'
 };
 
-if(!news || !news.length){
-  document.getElementById('newsResults').innerHTML =
-    '<div class="empty">暂无数据</div>';
-  return;
-}
+
 
 const COMPLIANCE = `你是资深内容编辑，严格遵守国内审核规定。必须屏蔽：攻击领导人、主权争议、谣言、宗教极端。允许境外科技/娱乐/体育等内容。标题≤25字，禁用震惊等标题党词汇，禁止AI腔。`;
 
