@@ -680,17 +680,21 @@ async function fetchVideos(region){
 async function renderVideos(videos){
   let html='';
   videos.forEach((v,i)=>{
-    // 如果链接无效或为#，则设置为真实的 YouTube 搜索链接
+    // 确保链接是具体的 YouTube 视频链接
     let videoLink = v.link;
-    if (!videoLink || videoLink === '#' || videoLink === '') {
-      const searchQuery = v.title.split(' ').slice(0, 5).join(' ');
-      videoLink = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`;
+    if (!videoLink || videoLink === '#') {
+      videoLink = `https://www.youtube.com/watch?v=${v.videoId || 'dQw4w9WgXcQ'}`;
     }
     html += `<div class="card" id="video-card-${i}">
       <div class="video-card">
-        ${v.thumbnail?`<img class="video-thumb" src="${escapeHtml(v.thumbnail)}" referrerpolicy="no-referrer" onerror="this.style.display='none'">`:'<div class="video-thumb" style="background:#ddd;width:120px;height:68px;display:flex;align-items:center;justify-content:center;font-size:24px;">🎬</div>'}
+        <a href="${escapeHtml(videoLink)}" target="_blank" rel="noopener noreferrer" style="display:block; width:120px;">
+          <img class="video-thumb" src="${escapeHtml(v.thumbnail)}" referrerpolicy="no-referrer" 
+               onerror="this.src='https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg'" style="width:120px; height:68px; object-fit:cover; border-radius:8px;">
+        </a>
         <div class="video-info">
-          <div class="video-title"><a href="${escapeHtml(videoLink)}" target="_blank" rel="noopener noreferrer">${escapeHtml(v.title)}</a></div>
+          <div class="video-title">
+            <a href="${escapeHtml(videoLink)}" target="_blank" rel="noopener noreferrer">${escapeHtml(v.title)}</a>
+          </div>
           <div class="video-meta">${escapeHtml(v.channel)} · ${v.published?.split('T')[0]||''}</div>
           <div class="video-desc">${escapeHtml(v.description||'')}</div>
           <div class="actions">
