@@ -107,15 +107,11 @@ select,input[type=text]{height:38px;border:1px solid #ddd;border-radius:8px;padd
 	<!-- 视频模式 -->
 	<div id="videoPanel" class="panel" style="display:none">
 	  <div class="row">
-		<select id="videoPlatform">
-		  <option value="bilibili">B站热门</option>
-		  <option value="douyin">抖音热点</option>
-		</select>
-		<input type="text" id="videoKwInput" placeholder="输入关键词搜索视频，如：五一旅游" style="flex:1;"/>
+		<input type="text" id="videoKwInput" placeholder="输入关键词搜索视频，如：五一旅游、新能源车" style="flex:1;"/>
 		<button class="btn-go" id="goVideoBtn">获取视频</button>
 	  </div>
-	  <div class="notice">💡 国内热门视频平台（B站/抖音），点击标题直接跳转观看。点击“生成介绍文”可撰写发布文案。</div>
-	  <div id="videoResults"><div class="empty">选择平台或输入关键词，点击获取</div></div>
+	  <div class="notice">💡 国内热门视频（B站/抖音），点击标题直接跳转观看。点击“生成介绍文”可撰写发布文案。</div>
+	  <div id="videoResults"><div class="empty">输入关键词，点击获取热门视频</div></div>
 	</div>
 
   <!-- 自定义社评区 -->
@@ -678,19 +674,19 @@ async function fetchVideos(region){
 async function renderVideos(videos){
   let html='';
   videos.forEach((v,i)=>{
-    const videoLink = v.link || `https://www.bilibili.com/video/${v.bvid}`;
-    const thumbnail = v.thumbnail || `https://i0.hdslb.com/bfs/archive/${v.bvid}.jpg`;
+    const videoLink = v.link;
+    const thumbnail = v.thumbnail || `https://placeholder.pics/svg/120x68/1aab6d/fff?text=视频`;
     html += `<div class="card" id="video-card-${i}">
       <div class="video-card">
         <a href="${escapeHtml(videoLink)}" target="_blank" rel="noopener noreferrer" style="display:block; width:120px;">
           <img class="video-thumb" src="${escapeHtml(thumbnail)}" referrerpolicy="no-referrer" 
-               onerror="this.src='https://placeholder.pics/svg/120x68/ccc/ddd?text=视频预览'" style="width:120px; height:68px; object-fit:cover; border-radius:8px;">
+               onerror="this.src='https://placeholder.pics/svg/120x68/ccc/ddd?text=预览'" style="width:120px; height:68px; object-fit:cover; border-radius:8px;">
         </a>
         <div class="video-info">
           <div class="video-title">
             <a href="${escapeHtml(videoLink)}" target="_blank" rel="noopener noreferrer">${escapeHtml(v.title)}</a>
           </div>
-          <div class="video-meta">${escapeHtml(v.channel)} · ${v.published?.split('T')[0]||''} · 播放 ${v.stat?.toLocaleString()||'0'}</div>
+          <div class="video-meta">${escapeHtml(v.channel)} · ${v.published?.split('T')[0]||''}</div>
           <div class="video-desc">${escapeHtml(v.description||'')}</div>
           <div class="actions">
             <button class="btn-sm" onclick="genVideoArticle(${i})">📝 生成介绍文</button>
@@ -705,14 +701,13 @@ async function renderVideos(videos){
   videoCache = videos;
 }
 async function loadVideos(){
-  const platform = document.getElementById('videoPlatform')?.value || 'bilibili';
   const kw = document.getElementById('videoKwInput')?.value.trim() || '';
   const container = document.getElementById('videoResults');
   if(!container) return;
   container.innerHTML = '<div class="loading"><span class="spinner"></span> 搜索视频中...</div>';
   try{
-    let url = `/api/video?platform=${platform}`;
-    if (kw) url += `&kw=${encodeURIComponent(kw)}`;
+    let url = `/api/video`;
+    if (kw) url += `?kw=${encodeURIComponent(kw)}`;
     const res = await fetch(url);
     const data = await res.json();
     const videos = data.videos || [];
