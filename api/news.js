@@ -1,5 +1,6 @@
 // ==========================================
 // 商业级热点聚合接口（多源 + 去重 + 聚类 + 热度排序）
+// 增加日期字段
 // ==========================================
 
 const API_BASE = 'https://apis.tianapi.com';
@@ -42,7 +43,8 @@ function cleanText(str) {
 }
 
 // ========== 2. 多源数据采集 ==========
-// Google 新闻
+
+// Google 新闻（增加发布时间）
 async function fetchGoogleNews(keyword) {
   if (!keyword) return [];
   try {
@@ -54,10 +56,17 @@ async function fetchGoogleNews(keyword) {
     return blocks.slice(0, 10).map(block => {
       let title = block.match(/<title>([\s\S]*?)<\/title>/)?.[1] || '';
       let summary = block.match(/<description>([\s\S]*?)<\/description>/)?.[1] || '';
+      let pubDate = block.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] || '';
       title = cleanText(title);
       summary = cleanText(summary);
       if (!title) return null;
-      return { title: title.slice(0, 80), summary: summary.slice(0, 150), source: 'Google新闻', hot: 0 };
+      return { 
+        title: title.slice(0, 80), 
+        summary: summary.slice(0, 150), 
+        source: 'Google新闻', 
+        hot: 0,
+        pubDate: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString()
+      };
     }).filter(Boolean);
   } catch { return []; }
 }
@@ -76,7 +85,7 @@ async function fetchTianApi(apiPath) {
       summary: cleanText(item.description || item.content || '').slice(0, 150),
       source: item.source || '天行数据',
       hot: parseInt(item.hot) || 0,
-      publishTime: item.ctime || item.time || new Date().toISOString()  // 添加发布时间
+      pubDate: item.ctime ? new Date(item.ctime).toISOString() : new Date().toISOString()
     }));
   } catch { return []; }
 }
@@ -98,7 +107,7 @@ async function fetchVvhanHot(source = 'weibo') {
       summary: `热度值 ${item.hot || '飙升中'}，网友热议。`,
       source: source === 'weibo' ? '微博热搜' : (source === 'zhihu' ? '知乎热榜' : '36氪热榜'),
       hot: parseInt(item.hot) || 0,
-      publishTime: new Date().toISOString()  // 热榜数据使用当前时间
+      pubDate: new Date().toISOString()
     }));
   } catch { return []; }
 }
@@ -151,8 +160,7 @@ function calcScore(group) {
   return score;
 }
 
-// ========== 7. 主聚合函数 ==========
-// ========== 7. 主聚合函数（增加时间字段） ==========
+// ========== 7. 主聚合函数（增加日期字段） ==========
 async function aggregateEvents({ topic, kw }) {
   let allNews = [];
   const promises = [];
@@ -181,10 +189,12 @@ async function aggregateEvents({ topic, kw }) {
   const clusters = clusterNews(deduped);
   const events = clusters.map(group => {
     // 获取该组最新的发布时间
-    const latestDate = group.reduce((latest, item) => {
-      const itemDate = item.publishTime || new Date().toISOString();
-      return itemDate > latest ? itemDate : latest;
-    }, '');
+    let latestDate = '';
+    for (const item of group) {
+      if (item.pubDate && item.pubDate > latestDate) {
+        latestDate = item.pubDate;
+      }
+    }
     
     return {
       event: group[0].title,
@@ -195,9 +205,9 @@ async function aggregateEvents({ topic, kw }) {
         summary: a.summary,
         source: a.source,
         hot: a.hot,
-        pubDate: a.publishTime || new Date().toISOString()  // 添加日期字段
+        pubDate: a.pubDate || new Date().toISOString()
       })),
-      pubDate: latestDate || new Date().toISOString()  // 事件最新日期
+      pubDate: latestDate || new Date().toISOString()
     };
   });
   events.sort((a, b) => b.heat - a.heat);
@@ -211,11 +221,11 @@ export default async function handler(req, res) {
   try {
     const events = await aggregateEvents({ topic, kw });
     if (events.length === 0) {
-      return res.status(200).json({ events: [{ event: '暂无热点事件', heat: 0, count: 0, articles: [] }] });
+      return res.status(200).json({ events: [{ event: '暂无热点事件', heat: 0, count: 0, articles: [], pubDate: new Date().toISOString() }] });
     }
     res.status(200).json({ events: events.slice(0, 8) });
   } catch (err) {
     console.error('聚合失败:', err);
-    res.status(200).json({ events: [{ event: '热点加载中', heat: 0, count: 0, articles: [] }] });
+    res.status(200).json({ events: [{ event: '热点加载中', heat: 0, count: 0, articles: [], pubDate: new Date().toISOString() }] });
   }
 }
