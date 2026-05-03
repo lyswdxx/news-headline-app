@@ -107,8 +107,8 @@ select,input[type=text]{height:38px;border:1px solid #ddd;border-radius:8px;padd
 <script>
 let curStyle = 'popular';
 let newsCache = [];
-let fullArticles = {};   // { newsId: { short, medium, long } }
-let shepingCache = {};   // { newsId: { 200,500,800 } }
+let fullArticles = {};
+let shepingCache = {};
 let videoCache = [];
 let lastCustomSheping = {};
 
@@ -192,7 +192,6 @@ async function renderAll(news, kw){
     </div>`;
   });
   document.getElementById('newsResults').innerHTML = html;
-  document.getElementById('countBar').innerHTML = `通过 ${pass} 条，过滤 ${news.length-pass} 条`;
 }
 
 async function startNews(){
@@ -246,10 +245,10 @@ function getShepConfig(w){
   return {desc:'500字社评', maxTokens:800};
 }
 
-// 全文改写为第一手报道
 async function genFullArticle(i){
   const n = newsCache[i];
   const lenSelect = document.getElementById(`lenSelect-${i}`);
+  if(!lenSelect) return;
   const lenType = lenSelect.value;
   const cfg = getLengthConfig(lenType);
   if(fullArticles[i] && fullArticles[i][lenType]){
@@ -259,6 +258,7 @@ async function genFullArticle(i){
   }
   const box = document.getElementById(`full-article-${i}`);
   const contentDiv = document.getElementById(`full-content-${i}`);
+  if(!box || !contentDiv) return;
   box.style.display = 'block';
   contentDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 重新编辑报道中...</div>';
   const curTitle = document.getElementById(`ht-${i}`)?.innerText || fallbackTitle(n);
@@ -280,10 +280,10 @@ async function genFullArticle(i){
   }
 }
 
-// 社评生成
 async function genSheping(i){
   const n = newsCache[i];
   const lenSelect = document.getElementById(`shepLenSelect-${i}`);
+  if(!lenSelect) return;
   const word = lenSelect.value;
   const cfg = getShepConfig(word);
   if(shepingCache[i] && shepingCache[i][word]){
@@ -293,6 +293,7 @@ async function genSheping(i){
   }
   const box = document.getElementById(`sheping-${i}`);
   const contentDiv = document.getElementById(`sheping-content-${i}`);
+  if(!box || !contentDiv) return;
   box.style.display = 'block';
   contentDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 撰写社评...</div>';
   const curTitle = document.getElementById(`ht-${i}`)?.innerText || fallbackTitle(n);
@@ -359,27 +360,37 @@ function copyCustom(){
   if(content) navigator.clipboard.writeText(content);
 }
 
-// 视频模式
+// ---------- 视频模式（带多重备用） ----------
 async function fetchVideos(region){
-  const res = await fetch(`/api/video?region=${region}`);
-  if(!res.ok) throw new Error('视频抓取失败');
-  const d = await res.json();
-  return d.videos || [];
+  try{
+    const res = await fetch(`/api/video?region=${region}`);
+    if(!res.ok) throw new Error('HTTP error');
+    const data = await res.json();
+    if(data.videos && data.videos.length>0) return data.videos;
+    throw new Error('no videos');
+  }catch(e){
+    console.warn('API失败，使用模拟数据', e);
+    // 模拟数据（示例）
+    return [
+      { title: '示例：热门视频1', link: '#', channel: '示例频道', published: new Date().toISOString(), description: '这是模拟数据，真实API暂时不可用。请稍后重试。', thumbnail: '' },
+      { title: '示例：热门视频2', link: '#', channel: '示例频道', published: new Date().toISOString(), description: '您可以继续使用“生成介绍文”体验功能。', thumbnail: '' }
+    ];
+  }
 }
 async function renderVideos(videos){
   let html='';
   videos.forEach((v,i)=>{
     html += `<div class="card" id="video-card-${i}">
       <div class="video-card">
-        ${v.thumbnail?`<img class="video-thumb" src="${escapeHtml(v.thumbnail)}" referrerpolicy="no-referrer">`:'<div class="video-thumb"></div>'}
+        ${v.thumbnail?`<img class="video-thumb" src="${escapeHtml(v.thumbnail)}" referrerpolicy="no-referrer" onerror="this.style.display='none'">`:'<div class="video-thumb" style="background:#ddd;width:120px;height:68px;"></div>'}
         <div class="video-info">
           <div class="video-title"><a href="${escapeHtml(v.link)}" target="_blank">${escapeHtml(v.title)}</a></div>
           <div class="video-meta">${escapeHtml(v.channel)} · ${v.published?.split('T')[0]||''}</div>
           <div class="video-desc">${escapeHtml(v.description||'')}</div>
           <div class="actions">
             <button class="btn-sm" onclick="genVideoArticle(${i})">📝 生成介绍文</button>
-            <div id="video-art-${i}" class="hot-article" style="display:none"></div>
           </div>
+          <div id="video-art-${i}" class="hot-article" style="display:none; margin-top:8px"></div>
         </div>
       </div>
     </div>`;
@@ -387,27 +398,36 @@ async function renderVideos(videos){
   document.getElementById('videoResults').innerHTML = html;
   videoCache = videos;
 }
+async function loadVideos(){
+  const region = document.getElementById('videoRegion').value;
+  const container = document.getElementById('videoResults');
+  container.innerHTML = '<div class="loading"><span class="spinner"></span> 获取中...</div>';
+  try{
+    const videos = await fetchVideos(region);
+    await renderVideos(videos);
+  }catch(e){
+    container.innerHTML = `<div class="err">获取失败: ${e.message}</div>`;
+  }
+}
 async function genVideoArticle(idx){
   const v = videoCache[idx];
+  if(!v) return;
   const container = document.getElementById(`video-art-${idx}`);
   container.style.display = 'block';
   container.innerHTML = '<div class="loading"><span class="spinner"></span> 生成中...</div>';
-  const prompt = `根据视频信息写一篇150-200字的介绍文，用于发布：\n标题：${v.title}\n频道：${v.channel}\n描述：${v.description||'无'}\n输出短文。`;
+  const prompt = `根据视频信息写一篇150-200字的介绍文，用于发布：\n标题：${v.title}\n频道：${v.channel}\n描述：${v.description||'无'}\n输出短文，语言活泼，避免AI腔。`;
   try{
     const text = await callDS([{role:'user',content:prompt}], 500);
     container.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(text)}</div><button class="btn-sm" onclick="copyTextFromEl(this)">复制</button>`;
-  }catch(e){ container.innerHTML = `<div class="err">失败</div>`; }
+  }catch(e){
+    container.innerHTML = `<div class="err">生成失败</div>`;
+  }
 }
 function copyTextFromEl(btn){ const txt = btn.previousSibling.innerText; navigator.clipboard.writeText(txt); alert('已复制'); }
 
-// 事件绑定
+// 绑定事件
 document.getElementById('goNewsBtn').addEventListener('click', startNews);
-document.getElementById('goVideoBtn').addEventListener('click', async()=>{
-  const region = document.getElementById('videoRegion').value;
-  document.getElementById('videoResults').innerHTML = '<div class="loading"><span class="spinner"></span> 获取中...</div>';
-  try{ const videos = await fetchVideos(region); await renderVideos(videos); }
-  catch(e){ document.getElementById('videoResults').innerHTML = `<div class="err">${e.message}</div>`; }
-});
+document.getElementById('goVideoBtn').addEventListener('click', loadVideos);
 document.getElementById('genCustomShepingBtn').addEventListener('click', generateCustomSheping);
 document.getElementById('copyCustomShepingBtn').addEventListener('click', copyCustom);
 document.querySelectorAll('.tab-btn').forEach(btn=>{
