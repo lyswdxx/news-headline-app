@@ -312,20 +312,21 @@ async function renderAllEvents(events, kw) {
   let html = '';
   
   // 格式化具体时间函数
-	const formatDateTime = (dateStr) => {
-	  if (!dateStr) return '时间未知';
-	  try {
-		const date = new Date(dateStr);
-		const year = date.getFullYear();
-		const month = String(date.getMonth() + 1).padStart(2, '0');
-		const day = String(date.getDate()).padStart(2, '0');
-		const hours = String(date.getHours()).padStart(2, '0');
-		const minutes = String(date.getMinutes()).padStart(2, '0');
-		return `${year}-${month}-${day} ${hours}:${minutes}`;
-	  } catch {
-		return dateStr.slice(0, 16).replace('T', ' ');
-	  }
-	};
+  const formatDateTime = (dateStr) => {
+    if (!dateStr) return '时间未知';
+    try {
+      const date = new Date(dateStr);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    } catch {
+      return dateStr.slice(0, 19).replace('T', ' ');
+    }
+  };
   
   events.forEach((e, i) => {
     const heatLevel = e.heat > 100 ? '🔥🔥🔥' : (e.heat > 50 ? '🔥🔥' : '🔥');
