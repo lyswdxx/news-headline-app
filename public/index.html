@@ -1,65 +1,64 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>头条新闻合规生成</title>
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f5f5f5; color: #1a1a1a; min-height: 100vh; }
-.page { max-width: 780px; margin: 0 auto; padding: 24px 16px 60px; }
-h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
-.sub { font-size: 13px; color: #888; margin-bottom: 20px; }
-.panel { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
-.row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-select, input[type=text] { height: 38px; border: 1px solid #ddd; border-radius: 8px; padding: 0 12px; font-size: 14px; background: #fff; outline: none; }
-select { min-width: 110px; }
-input[type=text] { flex: 1; min-width: 160px; }
-input[type=text]:focus { border-color: #1aab6d; }
-.btn-go { height: 38px; padding: 0 22px; background: #1aab6d; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
-.btn-go:disabled { background: #ccc; cursor: not-allowed; }
-.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
-.tab { font-size: 12px; padding: 5px 14px; border-radius: 20px; cursor: pointer; border: 1px solid #e0e0e0; background: #fff; color: #666; }
-.tab.on { background: #1aab6d; color: #fff; border-color: #1aab6d; }
-.notice { font-size: 12px; color: #999; background: #f9f9f9; border-radius: 8px; padding: 8px 12px; margin-top: 12px; line-height: 1.7; }
-.card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
-.card.blocked { background: #fff5f5; border: 1px solid #fcc; }
-.card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
-.orig-title { font-size: 15px; font-weight: 500; line-height: 1.5; flex: 1; }
-.tags { display: flex; gap: 5px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
-.tag { font-size: 11px; padding: 2px 8px; border-radius: 20px; }
-.tag-ok { background: #e6f9f0; color: #0a7a4a; }
-.tag-block { background: #fde8e8; color: #c0392b; }
-.tag-cat { background: #ede9fe; color: #5b21b6; }
-.source { font-size: 12px; color: #aaa; margin-bottom: 8px; }
-.summary { font-size: 13px; color: #555; line-height: 1.7; margin-bottom: 10px; }
-.compliance { font-size: 12px; padding: 6px 12px; border-radius: 8px; background: #f5f5f5; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
-.dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.dot-g { background: #1aab6d; }
-.dot-r { background: #e74c3c; }
-.headline-box { border-left: 3px solid #1aab6d; padding: 10px 14px; background: #f6fdf9; border-radius: 0 8px 8px 0; margin-bottom: 10px; }
-.hl-label { font-size: 11px; color: #aaa; margin-bottom: 4px; }
-.hl-title { font-size: 15px; font-weight: 600; color: #111; line-height: 1.5; }
-.hl-hook { font-size: 13px; color: #444; margin-top: 5px; line-height: 1.6; }
-.actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.btn-sm { height: 30px; padding: 0 14px; font-size: 12px; cursor: pointer; border: 1px solid #ddd; border-radius: 8px; background: #fff; }
-.btn-sm:hover { background: #f5f5f5; }
-.char-tip { font-size: 11px; color: #aaa; }
-.char-tip.over { color: #e74c3c; }
-.loading { text-align: center; padding: 40px; color: #888; font-size: 14px; }
-.spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #e0e0e0; border-top-color: #1aab6d; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.err { background: #fde8e8; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #c0392b; margin-bottom: 12px; }
-.empty { text-align: center; padding: 60px 20px; color: #bbb; font-size: 14px; line-height: 2.2; }
-.count { font-size: 12px; color: #999; margin-bottom: 12px; }
-.block-tip { font-size: 12px; color: #c0392b; padding-top: 4px; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:#f5f5f5;color:#1a1a1a;min-height:100vh}
+.page{max-width:780px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:20px;font-weight:600;margin-bottom:4px}
+.sub{font-size:13px;color:#888;margin-bottom:20px}
+.panel{background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.07)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+select,input[type=text]{height:38px;border:1px solid #ddd;border-radius:8px;padding:0 12px;font-size:14px;background:#fff;outline:none}
+select{min-width:110px}
+input[type=text]{flex:1;min-width:160px}
+input[type=text]:focus{border-color:#1aab6d}
+.btn-go{height:38px;padding:0 22px;background:#1aab6d;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap}
+.btn-go:disabled{background:#ccc;cursor:not-allowed}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{font-size:12px;padding:5px 14px;border-radius:20px;cursor:pointer;border:1px solid #e0e0e0;background:#fff;color:#666}
+.tab.on{background:#1aab6d;color:#fff;border-color:#1aab6d}
+.notice{font-size:12px;color:#999;background:#f9f9f9;border-radius:8px;padding:8px 12px;margin-top:12px;line-height:1.7}
+.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.07)}
+.card.blocked{background:#fff5f5;border:1px solid #fcc}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px}
+.orig-title{font-size:15px;font-weight:500;line-height:1.5;flex:1}
+.tags{display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.tag{font-size:11px;padding:2px 8px;border-radius:20px}
+.tag-ok{background:#e6f9f0;color:#0a7a4a}
+.tag-block{background:#fde8e8;color:#c0392b}
+.tag-cat{background:#ede9fe;color:#5b21b6}
+.source{font-size:12px;color:#aaa;margin-bottom:8px}
+.summary{font-size:13px;color:#555;line-height:1.7;margin-bottom:10px}
+.compliance{font-size:12px;padding:6px 12px;border-radius:8px;background:#f5f5f5;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dot-g{background:#1aab6d}
+.dot-r{background:#e74c3c}
+.headline-box{border-left:3px solid #1aab6d;padding:10px 14px;background:#f6fdf9;border-radius:0 8px 8px 0;margin-bottom:10px}
+.hl-label{font-size:11px;color:#aaa;margin-bottom:4px}
+.hl-title{font-size:15px;font-weight:600;color:#111;line-height:1.5}
+.hl-hook{font-size:13px;color:#444;margin-top:5px;line-height:1.6}
+.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn-sm{height:30px;padding:0 14px;font-size:12px;cursor:pointer;border:1px solid #ddd;border-radius:8px;background:#fff}
+.btn-sm:hover{background:#f5f5f5}
+.char-tip{font-size:11px;color:#aaa}
+.char-tip.over{color:#e74c3c}
+.loading{text-align:center;padding:40px;color:#888;font-size:14px}
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid #e0e0e0;border-top-color:#1aab6d;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err{background:#fde8e8;border-radius:8px;padding:12px 16px;font-size:13px;color:#c0392b;margin-bottom:12px}
+.empty{text-align:center;padding:60px 20px;color:#bbb;font-size:14px;line-height:2.2}
+.count{font-size:12px;color:#999;margin-bottom:12px}
+.block-tip{font-size:12px;color:#c0392b;padding-top:4px}
 </style>
 </head>
 <body>
 <div class="page">
   <h1>头条新闻合规生成</h1>
-  <p class="sub">自动搜索新闻 · 合规审核过滤 · 生成符合平台规范的头条文案</p>
-
+  <p class="sub">自动抓取新闻 · 合规审核过滤 · 生成符合平台规范的头条文案</p>
   <div class="panel">
     <div class="row">
       <select id="topicSel">
@@ -72,10 +71,10 @@ input[type=text]:focus { border-color: #1aab6d; }
         <option value="汽车">汽车</option>
         <option value="教育">教育</option>
       </select>
-      <input type="text" id="kwInput" placeholder="或输入关键词，如：新能源车、医保…" />
+      <input type="text" id="kwInput" placeholder="或输入关键词，如：新能源车、医保…"/>
       <button class="btn-go" id="goBtn" onclick="start()">获取并生成</button>
     </div>
-    <div class="tabs" id="styleTabs">
+    <div class="tabs">
       <div class="tab on" data-s="popular" onclick="setStyle(this)">民生关怀</div>
       <div class="tab" data-s="story" onclick="setStyle(this)">故事叙述</div>
       <div class="tab" data-s="data" onclick="setStyle(this)">数据说话</div>
@@ -84,26 +83,22 @@ input[type=text]:focus { border-color: #1aab6d; }
     </div>
     <div class="notice">合规过滤：自动屏蔽政治敏感、谣言、夸大宣传等内容 · 标题控制在25字内 · 去除AI写作痕迹</div>
   </div>
-
   <div id="errBox" style="display:none" class="err"></div>
   <div id="countBar" class="count" style="display:none"></div>
   <div id="results"><div class="empty">选择分类或输入关键词<br>点击「获取并生成」开始</div></div>
 </div>
-
 <script>
-const API = '/api/claude';
-let curStyle = 'popular';
-let newsCache = [];
+let curStyle='popular', newsCache=[];
 
-const styleGuide = {
-  popular:  '民生关怀风格：关注普通人生活，语言亲切自然，突出与读者切身相关的内容，用"你""我们"拉近距离',
-  story:    '故事叙述风格：以人物或事件为主线，有起承转合，读来有画面感，像在讲一个真实发生的故事',
-  data:     '数据说话风格：用具体数字、对比、增幅说话，让读者一眼看到变化规模，数字必须来自原文',
-  guide:    '实用指南风格：给读者明确的行动建议或知识要点，标题中有"怎么""如何""注意"等引导词',
-  analysis: '深度解读风格：剖析现象背后的原因与趋势，语气沉稳客观，适合有一定知识背景的读者'
+const styleGuide={
+  popular:'民生关怀风格：关注普通人生活，语言亲切自然，突出与读者切身相关的内容，用"你""我们"拉近距离',
+  story:'故事叙述风格：以人物或事件为主线，有起承转合，读来有画面感，像在讲一个真实发生的故事',
+  data:'数据说话风格：用具体数字、对比、增幅说话，让读者一眼看到变化规模，数字必须来自原文',
+  guide:'实用指南风格：给读者明确的行动建议或知识要点，标题中有"怎么""如何""注意"等引导词',
+  analysis:'深度解读风格：剖析现象背后的原因与趋势，语气沉稳客观，适合有一定知识背景的读者'
 };
 
-const COMPLIANCE = `你是今日头条平台资深内容编辑，熟悉国内内容审核规定和平台规范。
+const COMPLIANCE=`你是今日头条平台资深内容编辑，熟悉国内内容审核规定和平台规范。
 
 【直接屏蔽的内容】
 - 涉及党政领导人的批评或负面解读
@@ -115,146 +110,141 @@ const COMPLIANCE = `你是今日头条平台资深内容编辑，熟悉国内内
 【头条平台规范】
 - 标题不超过25字
 - 禁止"震惊""炸了""疯传"等标题党词汇
-- 禁止无官方背书的"最""第一""唯一""史上"等绝对化用语
+- 禁止无官方背书的绝对化用语
 - 不能夸大数据或捏造数字
-- 不能有AI写作痕迹：禁用"首先、其次、综上所述"等模板词；语言要有人情味
-
-【写作要求】
-- 标题：25字以内，不用感叹号，让读者觉得"这和我有关"
-- 导语：40字以内，补充核心细节
+- 禁用"首先、其次、综上所述"等模板词；语言要有人情味
 - 绝不出现"AI""人工智能生成""综合整理"等词`;
 
-function setStyle(el) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+function setStyle(el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   el.classList.add('on');
-  curStyle = el.dataset.s;
+  curStyle=el.dataset.s;
 }
 
-async function callAPI(body) {
-  const r = await fetch(API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+async function callDS(messages,maxTokens=1000){
+  const r=await fetch('/api/claude',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'deepseek-chat',
+      max_tokens:maxTokens,
+      messages
+    })
   });
-  if (!r.ok) throw new Error('接口错误 ' + r.status);
+  if(!r.ok){
+    const e=await r.json().catch(()=>({}));
+    throw new Error(e.error||('接口错误 '+r.status));
+  }
   return r.json();
 }
 
-async function start() {
-  const kw = document.getElementById('kwInput').value.trim() || document.getElementById('topicSel').value;
-  document.getElementById('errBox').style.display = 'none';
-  document.getElementById('countBar').style.display = 'none';
-  document.getElementById('goBtn').disabled = true;
-  document.getElementById('results').innerHTML = '<div class="loading"><span class="spinner"></span>正在搜索最新资讯…</div>';
-  try {
-    const d1 = await callAPI({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
-      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-      messages: [{
-        role: 'user',
-        content: '搜索最近48小时内关于"' + kw + '"的新闻，找5条有价值、来源权威（人民日报、新华社、央视、澎湃、36kr等）的新闻。严格返回JSON，不要markdown：{"news":[{"title":"原始标题","summary":"100字内摘要含核心事实","source":"媒体名称","category":"分类"}]}'
-      }]
-    });
-    const t1 = (d1.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-    const m1 = t1.match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(m1 ? m1[0] : t1);
-    const news = (parsed.news||[]).slice(0,5);
-    if (!news.length) throw new Error('未搜到相关新闻，请换个关键词');
-    newsCache = news;
-    await renderAll(news, kw);
-  } catch(e) {
-    document.getElementById('errBox').textContent = e.message || '出错了，请重试';
-    document.getElementById('errBox').style.display = 'block';
-    document.getElementById('results').innerHTML = '';
-  }
-  document.getElementById('goBtn').disabled = false;
+function getContent(d){
+  return((d.choices||[])[0]?.message?.content||'').trim();
 }
 
-async function renderAll(news, kw) {
-  document.getElementById('results').innerHTML = '<div class="loading"><span class="spinner"></span>合规审核 + 生成文案中…</div>';
-  const results = await batchGen(news);
-  let html = '', ok = 0, blocked = 0;
-  results.forEach((item, i) => {
-    const n = news[i];
-    const isBlock = item.compliance === 'block';
-    isBlock ? blocked++ : ok++;
-    const len = (item.title||'').length;
-    html += '<div class="card' + (isBlock?' blocked':'') + '">' +
-      '<div class="card-top"><div class="orig-title">' + n.title + '</div>' +
-      '<div class="tags"><span class="tag tag-cat">' + (n.category||kw) + '</span>' +
-      '<span class="tag ' + (isBlock?'tag-block':'tag-ok') + '">' + (isBlock?'已过滤':'合规通过') + '</span></div></div>' +
-      '<div class="source">来源：' + (n.source||'综合') + '</div>' +
-      '<div class="summary">' + n.summary + '</div>' +
-      '<div class="compliance"><div class="dot ' + (isBlock?'dot-r':'dot-g') + '"></div>' +
-      '<span style="color:' + (isBlock?'#c0392b':'#0a7a4a') + '">' + (item.reason||'') + '</span></div>' +
-      (!isBlock ?
-        '<div class="headline-box"><div class="hl-label">头条文案</div>' +
-        '<div class="hl-title" id="ht-' + i + '">' + (item.title||'') + '</div>' +
-        '<div class="hl-hook" id="hs-' + i + '">' + (item.hook||'') + '</div></div>' +
-        '<div class="actions"><button class="btn-sm" onclick="copyIt(' + i + ')">复制文案</button>' +
-        '<button class="btn-sm" onclick="regenOne(' + i + ')">换一版</button>' +
-        '<span class="char-tip' + (len>25?' over':'') + '" id="cc-' + i + '">标题' + len + '字' + (len>25?'（超长）':'') + '</span></div>'
-        : '<div class="block-tip">此条内容涉及敏感领域，不建议发布</div>') +
+async function fetchNews(topic,kw){
+  const params=new URLSearchParams({topic,kw:kw||topic});
+  const r=await fetch('/api/news?'+params);
+  if(!r.ok) throw new Error('新闻抓取失败');
+  const d=await r.json();
+  return d.news||[];
+}
+
+async function start(){
+  const kw=document.getElementById('kwInput').value.trim();
+  const topic=document.getElementById('topicSel').value;
+  const keyword=kw||topic;
+  document.getElementById('errBox').style.display='none';
+  document.getElementById('countBar').style.display='none';
+  document.getElementById('goBtn').disabled=true;
+  document.getElementById('results').innerHTML='<div class="loading"><span class="spinner"></span>正在抓取最新新闻…</div>';
+  try{
+    const news=await fetchNews(topic,kw);
+    if(!news.length) throw new Error('暂无相关新闻，请换个关键词');
+    newsCache=news;
+    await renderAll(news,keyword);
+  }catch(e){
+    document.getElementById('errBox').textContent=e.message||'出错了，请重试';
+    document.getElementById('errBox').style.display='block';
+    document.getElementById('results').innerHTML='';
+  }
+  document.getElementById('goBtn').disabled=false;
+}
+
+async function renderAll(news,kw){
+  document.getElementById('results').innerHTML='<div class="loading"><span class="spinner"></span>合规审核 + 生成文案中…</div>';
+  const results=await batchGen(news);
+  let html='',ok=0,blocked=0;
+  results.forEach((item,i)=>{
+    const n=news[i];
+    const isBlock=item.compliance==='block';
+    isBlock?blocked++:ok++;
+    const len=(item.title||'').length;
+    html+='<div class="card'+(isBlock?' blocked':'')+'">'+
+      '<div class="card-top"><div class="orig-title">'+n.title+'</div>'+
+      '<div class="tags"><span class="tag tag-cat">'+kw+'</span>'+
+      '<span class="tag '+(isBlock?'tag-block':'tag-ok')+'">'+(isBlock?'已过滤':'合规通过')+'</span></div></div>'+
+      '<div class="source">来源：'+(n.source||'综合')+'</div>'+
+      '<div class="summary">'+(n.summary||'')+'</div>'+
+      '<div class="compliance"><div class="dot '+(isBlock?'dot-r':'dot-g')+'"></div>'+
+      '<span style="color:'+(isBlock?'#c0392b':'#0a7a4a')+'">'+(item.reason||'')+'</span></div>'+
+      (!isBlock?
+        '<div class="headline-box"><div class="hl-label">头条文案</div>'+
+        '<div class="hl-title" id="ht-'+i+'">'+(item.title||'')+'</div>'+
+        '<div class="hl-hook" id="hs-'+i+'">'+(item.hook||'')+'</div></div>'+
+        '<div class="actions"><button class="btn-sm" onclick="copyIt('+i+')">复制文案</button>'+
+        '<button class="btn-sm" onclick="regenOne('+i+')">换一版</button>'+
+        '<span class="char-tip'+(len>25?' over':'')+'" id="cc-'+i+'">标题'+len+'字'+(len>25?'（超长）':'')+'</span></div>'
+        :'<div class="block-tip">此条内容涉及敏感领域，不建议发布</div>')+
       '</div>';
   });
-  document.getElementById('results').innerHTML = html;
-  document.getElementById('countBar').textContent = '共 ' + news.length + ' 条 · ' + ok + ' 条通过 · ' + blocked + ' 条过滤';
-  document.getElementById('countBar').style.display = 'block';
+  document.getElementById('results').innerHTML=html;
+  document.getElementById('countBar').textContent='共 '+news.length+' 条 · '+ok+' 条通过 · '+blocked+' 条过滤';
+  document.getElementById('countBar').style.display='block';
 }
 
-async function batchGen(news) {
-  const d = await callAPI({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 1000,
-    messages: [{
-      role: 'user',
-      content: COMPLIANCE + '\n\n当前风格：' + styleGuide[curStyle] + '\n\n对以下每条新闻进行合规审核并生成头条文案。返回严格JSON数组，不要markdown：\n\n' +
-        news.map((n,i)=>(i+1)+'. 标题：'+n.title+'\n摘要：'+n.summary+'\n来源：'+n.source).join('\n\n') +
-        '\n\n返回格式：\n[{"compliance":"pass或block","reason":"审核结论15字内","title":"头条标题25字内","hook":"导语40字内"}]\n\nblock时title和hook留空字符串。'
-    }]
-  });
-  const t = (d.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-  try {
-    const m = t.match(/\[[\s\S]*\]/);
-    return JSON.parse(m ? m[0] : t);
-  } catch { return news.map(()=>({compliance:'pass',reason:'通过',title:'',hook:''})); }
+async function batchGen(news){
+  const prompt=COMPLIANCE+'\n\n当前风格：'+styleGuide[curStyle]+'\n\n对以下每条新闻进行合规审核并生成头条文案。返回严格JSON数组，不要markdown代码块：\n\n'+
+    news.map((n,i)=>(i+1)+'. 标题：'+n.title+'\n摘要：'+n.summary+'\n来源：'+n.source).join('\n\n')+
+    '\n\n返回格式：\n[{"compliance":"pass或block","reason":"审核结论15字内","title":"头条标题25字内","hook":"导语40字内"}]\n\nblock时title和hook留空字符串。';
+  try{
+    const d=await callDS([{role:'user',content:prompt}]);
+    const t=getContent(d);
+    const m=t.match(/\[[\s\S]*\]/);
+    return JSON.parse(m?m[0]:t);
+  }catch{return news.map(()=>({compliance:'pass',reason:'通过',title:'',hook:''}));}
 }
 
-async function regenOne(i) {
-  const n = newsCache[i]; if (!n) return;
-  document.getElementById('ht-'+i).textContent = '生成中…';
-  document.getElementById('hs-'+i).textContent = '';
-  const d = await callAPI({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 400,
-    messages: [{
-      role: 'user',
-      content: COMPLIANCE + '\n风格：' + styleGuide[curStyle] + '\n\n为以下新闻重新生成一版不同思路的头条文案：\n标题：' + n.title + '\n摘要：' + n.summary + '\n\n返回JSON（不要markdown）：{"title":"标题25字内","hook":"导语40字内"}'
-    }]
-  });
-  const t = (d.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-  try {
-    const m = t.match(/\{[\s\S]*\}/); const r = JSON.parse(m?m[0]:t);
-    document.getElementById('ht-'+i).textContent = r.title||'';
-    document.getElementById('hs-'+i).textContent = r.hook||'';
-    const len = (r.title||'').length;
-    const cc = document.getElementById('cc-'+i);
-    cc.textContent = '标题'+len+'字'+(len>25?'（超长）':'');
-    cc.className = 'char-tip'+(len>25?' over':'');
-  } catch { document.getElementById('ht-'+i).textContent = '生成失败，请重试'; }
+async function regenOne(i){
+  const n=newsCache[i]; if(!n) return;
+  document.getElementById('ht-'+i).textContent='生成中…';
+  document.getElementById('hs-'+i).textContent='';
+  const prompt=COMPLIANCE+'\n风格：'+styleGuide[curStyle]+'\n\n为以下新闻重新生成一版不同思路的头条文案，不能与之前重复：\n标题：'+n.title+'\n摘要：'+n.summary+'\n\n返回JSON（不要markdown代码块）：{"title":"标题25字内","hook":"导语40字内"}';
+  try{
+    const d=await callDS([{role:'user',content:prompt}],400);
+    const t=getContent(d);
+    const m=t.match(/\{[\s\S]*\}/);
+    const r=JSON.parse(m?m[0]:t);
+    document.getElementById('ht-'+i).textContent=r.title||'';
+    document.getElementById('hs-'+i).textContent=r.hook||'';
+    const len=(r.title||'').length;
+    const cc=document.getElementById('cc-'+i);
+    cc.textContent='标题'+len+'字'+(len>25?'（超长）':'');
+    cc.className='char-tip'+(len>25?' over':'');
+  }catch{document.getElementById('ht-'+i).textContent='生成失败，请重试';}
 }
 
-function copyIt(i) {
-  const title = document.getElementById('ht-'+i)?.textContent||'';
-  const hook = document.getElementById('hs-'+i)?.textContent||'';
+function copyIt(i){
+  const title=document.getElementById('ht-'+i)?.textContent||'';
+  const hook=document.getElementById('hs-'+i)?.textContent||'';
   navigator.clipboard.writeText(hook?title+'\n'+hook:title).then(()=>{
-    const btn = document.querySelectorAll('.btn-sm')[i*2];
+    const btns=document.querySelectorAll('.btn-sm');
+    const btn=btns[i*2];
     if(btn){btn.textContent='已复制 ✓';setTimeout(()=>btn.textContent='复制文案',1500);}
   });
 }
 
-document.getElementById('kwInput').addEventListener('keydown', e => { if(e.key==='Enter') start(); });
+document.getElementById('kwInput').addEventListener('keydown',e=>{if(e.key==='Enter')start();});
 </script>
 </body>
 </html>
