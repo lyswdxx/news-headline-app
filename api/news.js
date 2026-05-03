@@ -62,7 +62,7 @@ async function fetchGoogleNews(keyword) {
   } catch { return []; }
 }
 
-// 天行 API
+// 天行 API（增加发布时间）
 async function fetchTianApi(apiPath) {
   if (!apiKey) return [];
   try {
@@ -76,11 +76,12 @@ async function fetchTianApi(apiPath) {
       summary: cleanText(item.description || item.content || '').slice(0, 150),
       source: item.source || '天行数据',
       hot: parseInt(item.hot) || 0,
+      publishTime: item.ctime || item.time || new Date().toISOString()  // 添加发布时间
     }));
   } catch { return []; }
 }
 
-// VVHAN 热榜（微博/知乎/36kr）
+// VVHAN 热榜（增加发布时间）
 async function fetchVvhanHot(source = 'weibo') {
   try {
     const res = await fetch(VVHAN_API, { headers: { 'User-Agent': 'Mozilla/5.0' } });
@@ -97,6 +98,7 @@ async function fetchVvhanHot(source = 'weibo') {
       summary: `热度值 ${item.hot || '飙升中'}，网友热议。`,
       source: source === 'weibo' ? '微博热搜' : (source === 'zhihu' ? '知乎热榜' : '36氪热榜'),
       hot: parseInt(item.hot) || 0,
+      publishTime: new Date().toISOString()  // 热榜数据使用当前时间
     }));
   } catch { return []; }
 }
@@ -150,6 +152,7 @@ function calcScore(group) {
 }
 
 // ========== 7. 主聚合函数 ==========
+// ========== 7. 主聚合函数（增加时间字段） ==========
 async function aggregateEvents({ topic, kw }) {
   let allNews = [];
   const promises = [];
@@ -166,18 +169,37 @@ async function aggregateEvents({ topic, kw }) {
   promises.push(fetchVvhanHot(hotSource));
 
   const results = await Promise.allSettled(promises);
-  for (const r of results) if (r.status === 'fulfilled' && r.value.length) allNews.push(...r.value);
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value.length) {
+      allNews.push(...r.value);
+    }
+  }
 
   if (allNews.length === 0) return [];
 
   const deduped = dedupeNews(allNews);
   const clusters = clusterNews(deduped);
-  const events = clusters.map(group => ({
-    event: group[0].title,
-    heat: calcScore(group),
-    count: group.length,
-    articles: group,
-  }));
+  const events = clusters.map(group => {
+    // 获取该组最新的发布时间
+    const latestDate = group.reduce((latest, item) => {
+      const itemDate = item.publishTime || new Date().toISOString();
+      return itemDate > latest ? itemDate : latest;
+    }, '');
+    
+    return {
+      event: group[0].title,
+      heat: calcScore(group),
+      count: group.length,
+      articles: group.map(a => ({
+        title: a.title,
+        summary: a.summary,
+        source: a.source,
+        hot: a.hot,
+        pubDate: a.publishTime || new Date().toISOString()  // 添加日期字段
+      })),
+      pubDate: latestDate || new Date().toISOString()  // 事件最新日期
+    };
+  });
   events.sort((a, b) => b.heat - a.heat);
   return events;
 }
