@@ -180,12 +180,16 @@ async function fetchNews(topic, kw, limit = 10) {
   const params = new URLSearchParams({ 
     topic, 
     kw: kw || topic,
-    limit: limit.toString()   // 默认返回 10 条，可根据需要修改数字
+    limit: limit.toString()
   });
   const res = await fetch('/api/news?' + params);
   if (!res.ok) throw new Error('抓取失败');
   const d = await res.json();
-  return d.news || [];
+  // 前端二次清理摘要（防止残留标签）
+  return d.news.map(n => ({
+    ...n,
+    summary: n.summary.replace(/<[^>]*>/g, '').replace(/&[a-z]+;/g, '')
+  }));
 }
 
 function cleanNewsData(news){
@@ -283,7 +287,7 @@ async function startNews(){
   resultsDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 抓取中...</div>';
 
   try{
-    let news = await fetchNews(topic, kw);
+    let news = await fetchNews(topic, kw, 10); 
 	news = cleanNewsData(news);
 	
     // ✅ 双重兜底（关键）
