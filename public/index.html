@@ -308,6 +308,7 @@ async function renderAll(news, kw){
   });
   document.getElementById('newsResults').innerHTML = html;
 }
+// 统一渲染函数（支持事件模式和新闻模式，带字数选择和时间显示）
 async function renderAllEvents(events, kw) {
   let html = '';
   
@@ -328,38 +329,226 @@ async function renderAllEvents(events, kw) {
     }
   };
   
-  events.forEach((e, i) => {
-    const heatLevel = e.heat > 100 ? '🔥🔥🔥' : (e.heat > 50 ? '🔥🔥' : '🔥');
+  events.forEach((item, i) => {
+    // 兼容两种格式：事件格式 或 普通新闻格式
+    const isEvent = item.articles !== undefined;
+    const title = isEvent ? item.event : item.title;
+    const heat = isEvent ? (item.heat || 0) : (item.hot || 0);
+    const pubDate = isEvent ? item.pubDate : (item.pubDate || new Date().toISOString());
+    const count = isEvent ? (item.count || 1) : 1;
+    const articles = isEvent ? item.articles : [{ title: item.title, summary: item.summary, source: item.source, pubDate: pubDate }];
+    
+    const heatLevel = heat > 100 ? '🔥🔥🔥' : (heat > 50 ? '🔥🔥' : '🔥');
+    
     html += `
-      <div class="card" id="event-card-${i}">
+      <div class="card" id="card-${i}">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-          <strong style="font-size:16px;">${heatLevel} ${escapeHtml(e.event)}</strong>
+          <strong style="font-size:16px;">${heatLevel} ${escapeHtml(title)}</strong>
           <div style="display:flex; gap:12px; align-items:center;">
-            <span style="font-size:12px; background:#f0f0f0; padding:2px 8px; border-radius:20px;">热度 ${e.heat}</span>
-            <span style="font-size:12px; color:#888;">📅 ${formatDateTime(e.pubDate)}</span>
+            <span style="font-size:12px; background:#f0f0f0; padding:2px 8px; border-radius:20px;">热度 ${heat}</span>
+            <span style="font-size:12px; color:#888;">📅 ${formatDateTime(pubDate)}</span>
           </div>
         </div>
         
         <div style="margin:8px 0; font-size:12px; color:#888;">
-          📰 相关新闻 ${e.count} 条
+          📰 相关新闻 ${count} 条
         </div>
         
         <div style="margin-top:8px; font-size:13px; color:#555; background:#f9f9f9; padding:8px; border-radius:8px; max-height:150px; overflow-y:auto;">
-          ${e.articles.map(a => `• ${escapeHtml(a.title)} <span style="color:#aaa; font-size:11px;">(${formatDateTime(a.pubDate)})</span>`).join('<br>')}
+          ${articles.map(a => `• ${escapeHtml(a.title)} <span style="color:#aaa; font-size:11px;">(${formatDateTime(a.pubDate)})</span>`).join('<br>')}
         </div>
         
+        <!-- 头条文案区域 -->
+        <div class="headline-box" style="margin-top:12px;">
+          <div class="hl-label">头条文案</div>
+          <div class="hl-title" id="ht-${i}"></div>
+          <div class="hl-hook" id="hs-${i}"></div>
+        </div>
+        
+        <!-- 操作栏（包含字数选择） -->
         <div class="actions" style="margin-top:12px;">
-          <button class="btn-sm" onclick="genFromEvent(${i})">📝 生成文章</button>
-          <button class="btn-sm" onclick="genShepingFromEvent(${i})">📢 生成社评</button>
+          <button class="btn-sm" onclick="copyIt(${i})">复制文案</button>
+          <button class="btn-sm" onclick="regenOne(${i})">换一版</button>
+          <div class="length-selector">
+            <label>全文：</label>
+            <select id="lenSelect-${i}">
+              <option value="short">短文300-500</option>
+              <option value="medium" selected>中篇600-800</option>
+              <option value="long">长文1000-1500</option>
+            </select>
+          </div>
+          <button class="btn-sm" onclick="genFullArticle(${i})">📝 改写报道</button>
+          <div class="shep-length-selector">
+            <label>社评：</label>
+            <select id="shepLenSelect-${i}">
+              <option value="200">200字</option>
+              <option value="500" selected>500字</option>
+              <option value="800">800字</option>
+            </select>
+          </div>
+          <button class="btn-sm" onclick="genSheping(${i})">📢 生成社评</button>
+          <span class="char-tip" id="cc-${i}"></span>
         </div>
         
-        <div id="event-article-${i}" class="hot-article" style="display:none; margin-top:12px;"></div>
-        <div id="event-sheping-${i}" class="hot-article" style="display:none; margin-top:12px;"></div>
+        <div id="full-article-${i}" style="display:none; margin-top:12px">
+          <div class="hot-article" id="full-content-${i}"></div>
+          <button class="btn-sm" onclick="copyFullArticle(${i})">复制全文</button>
+        </div>
+        <div id="sheping-${i}" style="display:none; margin-top:12px">
+          <div class="hot-article" id="sheping-content-${i}"></div>
+          <button class="btn-sm" onclick="copySheping(${i})">复制社评</button>
+        </div>
       </div>
     `;
   });
   
   document.getElementById('newsResults').innerHTML = html || '<div class="empty">暂无热点事件</div>';
+  
+  // 为每个项目生成初始头条文案
+  for (let i = 0; i < events.length; i++) {
+    await genInitialHeadline(i, events[i]);
+  }
+}
+
+// 生成初始头条文案（兼容事件和新闻格式）
+async function genInitialHeadline(idx, item) {
+  const titleEl = document.getElementById(`ht-${idx}`);
+  const hookEl = document.getElementById(`hs-${idx}`);
+  if (!titleEl) return;
+  titleEl.innerText = '生成中...';
+  
+  const isEvent = item.articles !== undefined;
+  const eventTitle = isEvent ? item.event : item.title;
+  const articlesSummary = isEvent ? item.articles.map(a => a.title).join('；') : item.summary;
+  
+  const prompt = `${COMPLIANCE}\n风格：${styleGuide[curStyle]}\n根据以下内容生成头条文案(标题≤25字,导语≤40字)：\n标题：${eventTitle}\n摘要：${articlesSummary}\n返回JSON {"title":"","hook":""}`;
+  try {
+    const content = await callDS([{ role: 'user', content: prompt }], 400);
+    const json = JSON.parse(content.match(/\{.*\}/s)[0]);
+    titleEl.innerText = json.title || eventTitle.slice(0, 25);
+    hookEl.innerText = json.hook || '';
+    const len = (json.title || '').length;
+    const cc = document.getElementById(`cc-${idx}`);
+    if (cc) cc.innerText = `标题${len}字${len > 25 ? '超长' : ''}`;
+  } catch (e) {
+    titleEl.innerText = eventTitle.slice(0, 25);
+    hookEl.innerText = '';
+  }
+}
+
+// 修改 regenOne 函数（兼容事件格式）
+async function regenOne(i) {
+  const item = window.eventCache ? window.eventCache[i] : newsCache[i];
+  if (!item) return;
+  const titleEl = document.getElementById(`ht-${i}`);
+  const hookEl = document.getElementById(`hs-${i}`);
+  if (!titleEl) return;
+  titleEl.innerText = '生成中...';
+  
+  const isEvent = item.articles !== undefined;
+  const eventTitle = isEvent ? item.event : item.title;
+  const articlesSummary = isEvent ? item.articles.map(a => a.title).join('；') : item.summary;
+  
+  const prompt = `${COMPLIANCE}\n风格：${styleGuide[curStyle]}\n重新生成头条文案(不同思路)：\n标题：${eventTitle}\n摘要：${articlesSummary}\n返回JSON {"title":"","hook":""}`;
+  try {
+    const content = await callDS([{ role: 'user', content: prompt }], 400);
+    const json = JSON.parse(content.match(/\{.*\}/s)[0]);
+    titleEl.innerText = json.title || eventTitle.slice(0, 25);
+    hookEl.innerText = json.hook || '';
+    const len = (json.title || '').length;
+    const cc = document.getElementById(`cc-${i}`);
+    if (cc) cc.innerText = `标题${len}字${len > 25 ? '超长' : ''}`;
+    // 清除缓存
+    const fullDiv = document.getElementById(`full-article-${i}`);
+    if (fullDiv) fullDiv.style.display = 'none';
+    const shepDiv = document.getElementById(`sheping-${i}`);
+    if (shepDiv) shepDiv.style.display = 'none';
+    delete fullArticles[i];
+    delete shepingCache[i];
+  } catch (e) {
+    titleEl.innerText = eventTitle.slice(0, 25);
+  }
+}
+
+// 修改 genFullArticle 函数（兼容事件格式）
+async function genFullArticle(i) {
+  const item = window.eventCache ? window.eventCache[i] : newsCache[i];
+  if (!item) return;
+  const lenSelect = document.getElementById(`lenSelect-${i}`);
+  if (!lenSelect) return;
+  const lenType = lenSelect.value;
+  const cfg = getLengthConfig(lenType);
+  const fullDiv = document.getElementById(`full-article-${i}`);
+  const contentDiv = document.getElementById(`full-content-${i}`);
+  if (!fullDiv || !contentDiv) return;
+  
+  if (fullArticles[i] && fullArticles[i][lenType]) {
+    contentDiv.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(fullArticles[i][lenType])}</div>`;
+    fullDiv.style.display = 'block';
+    return;
+  }
+  fullDiv.style.display = 'block';
+  contentDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 重新编辑报道中...</div>';
+  
+  const isEvent = item.articles !== undefined;
+  const eventTitle = isEvent ? item.event : item.title;
+  const curTitle = document.getElementById(`ht-${i}`)?.innerText || eventTitle.slice(0, 25);
+  const allTitles = isEvent ? item.articles.map(a => a.title).join('\n') : item.title;
+  const prompt = `请将以下内容改写成一篇原创报道，字数${cfg.desc}。要求像第一手资料，客观叙述，避免评论。\n标题：${eventTitle}\n内容：${allTitles}\n已有标题：${curTitle}\n直接输出正文。`;
+  try {
+    const article = await callDS([{ role: 'user', content: prompt }], cfg.maxTokens);
+    let clean = article.replace(/```/g, '').trim();
+    clean = removeAiTone(clean);
+    if (clean.length < 200) throw new Error('内容过短');
+    if (!fullArticles[i]) fullArticles[i] = {};
+    fullArticles[i][lenType] = clean;
+    contentDiv.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(clean)}</div>`;
+  } catch (e) {
+    contentDiv.innerHTML = `<div class="err">生成失败：${e.message}</div>`;
+  }
+}
+
+// 修改 genSheping 函数（兼容事件格式）
+async function genSheping(i) {
+  const item = window.eventCache ? window.eventCache[i] : newsCache[i];
+  if (!item) return;
+  const lenSelect = document.getElementById(`shepLenSelect-${i}`);
+  if (!lenSelect) return;
+  const word = lenSelect.value;
+  const cfg = getShepConfig(word);
+  const shepDiv = document.getElementById(`sheping-${i}`);
+  const contentDiv = document.getElementById(`sheping-content-${i}`);
+  if (!shepDiv || !contentDiv) return;
+  
+  if (shepingCache[i] && shepingCache[i][word]) {
+    contentDiv.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(shepingCache[i][word])}</div>`;
+    shepDiv.style.display = 'block';
+    return;
+  }
+  shepDiv.style.display = 'block';
+  contentDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 撰写社评...</div>';
+  
+  const isEvent = item.articles !== undefined;
+  const eventTitle = isEvent ? item.event : item.title;
+  const allTitles = isEvent ? item.articles.map(a => a.title).join('\n') : item.title;
+  const prompt = `根据以下内容撰写社评，字数${cfg.desc}，标题自拟。要求积极建设性，遵守法规。\n标题：${eventTitle}\n内容：${allTitles}\n输出标题+正文。`;
+  try {
+    const article = await callDS([{ role: 'user', content: prompt }], cfg.maxTokens);
+    if (article.length < 50) throw new Error('过短');
+    if (!shepingCache[i]) shepingCache[i] = {};
+    shepingCache[i][word] = article;
+    contentDiv.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(article)}</div>`;
+  } catch (e) {
+    contentDiv.innerHTML = `<div class="err">失败：${e.message}</div>`;
+  }
+}
+
+// copyIt 保持不变
+function copyIt(i) {
+  const title = document.getElementById(`ht-${i}`)?.innerText || '';
+  const hook = document.getElementById(`hs-${i}`)?.innerText || '';
+  navigator.clipboard.writeText(hook ? title + '\n' + hook : title);
+  alert('已复制头条文案');
 }
 
 // 基于事件生成文章（去AI味）
@@ -428,32 +617,37 @@ async function startNews(){
   try{
     const data = await fetchNews(topic, kw, 10);
     
-    // 如果有事件数据，使用事件模式（带日期）
+    let events = [];
     if (data.events && data.events.length > 0) {
-      window.eventCache = data.events;
-      await renderAllEvents(data.events, kw || topic);
-      return;
+      events = data.events;
+    } else if (data.news && data.news.length > 0) {
+      // 将新闻格式转换为事件格式
+      events = data.news.map(n => ({
+        event: n.title,
+        heat: n.hot || 50,
+        count: 1,
+        articles: [{ ...n, pubDate: n.pubDate || new Date().toISOString() }],
+        pubDate: n.pubDate || new Date().toISOString()
+      }));
     }
     
-    // 否则降级到传统新闻模式
-    let news = data.news || [];
-    news = cleanNewsData(news);
-    
-    if(!news || news.length === 0){
-      news = getFallbackNews(topic, kw);
+    if (events.length === 0) {
+      events = [{
+        event: `暂无“${kw || topic}”相关热点`,
+        heat: 0,
+        count: 1,
+        articles: [{ title: '请尝试其他关键词', summary: '', source: '系统', pubDate: new Date().toISOString() }],
+        pubDate: new Date().toISOString()
+      }];
     }
-    if(!news || news.length === 0){
-      news = [{ title: '暂无可用新闻', summary: '当前接口异常，请稍后再试', source: '系统' }];
-    }
     
-    newsCache = news;
+    window.eventCache = events;
     fullArticles = {};
     shepingCache = {};
-    await renderAll(news, kw || topic);
+    await renderAllEvents(events, kw || topic);
 
   }catch(e){
     console.error(e);
-    // 尝试使用兜底事件
     const fallbackEvents = [{
       event: `热点加载中，请稍后重试`,
       heat: 0,
