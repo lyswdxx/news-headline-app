@@ -438,8 +438,9 @@ async function genInitialHeadline(idx, item) {
 
 // 修改 regenOne 函数（兼容事件格式）
 async function regenOne(i) {
-  const item = window.eventCache ? window.eventCache[i] : newsCache[i];
+  const item = window.eventCache ? window.eventCache[i] : (newsCache ? newsCache[i] : null);
   if (!item) return;
+  
   const titleEl = document.getElementById(`ht-${i}`);
   const hookEl = document.getElementById(`hs-${i}`);
   if (!titleEl) return;
@@ -447,9 +448,15 @@ async function regenOne(i) {
   
   const isEvent = item.articles !== undefined;
   const eventTitle = isEvent ? item.event : item.title;
-  const articlesSummary = isEvent ? item.articles.map(a => a.title).join('；') : item.summary;
+  let summaryText = '';
+  if (isEvent) {
+    summaryText = item.articles.map(a => a.title).join('；');
+  } else {
+    summaryText = item.summary || item.title;
+  }
   
-  const prompt = `${COMPLIANCE}\n风格：${styleGuide[curStyle]}\n重新生成头条文案(不同思路)：\n标题：${eventTitle}\n摘要：${articlesSummary}\n返回JSON {"title":"","hook":""}`;
+  const prompt = `${COMPLIANCE}\n风格：${styleGuide[curStyle]}\n重新生成头条文案(不同思路)：\n标题：${eventTitle}\n摘要：${summaryText}\n返回JSON {"title":"","hook":""}`;
+  
   try {
     const content = await callDS([{ role: 'user', content: prompt }], 400);
     const json = JSON.parse(content.match(/\{.*\}/s)[0]);
@@ -466,14 +473,21 @@ async function regenOne(i) {
     delete fullArticles[i];
     delete shepingCache[i];
   } catch (e) {
+    console.error('换一版失败:', e);
     titleEl.innerText = eventTitle.slice(0, 25);
+    hookEl.innerText = '';
   }
 }
 
 // 修改 genFullArticle 函数（兼容事件格式）
 async function genFullArticle(i) {
-  const item = window.eventCache ? window.eventCache[i] : newsCache[i];
-  if (!item) return;
+  // 优先从事件缓存读取，如果没有则从新闻缓存读取
+  const item = window.eventCache ? window.eventCache[i] : (newsCache ? newsCache[i] : null);
+  if (!item) {
+    console.error('未找到数据', i);
+    return;
+  }
+  
   const lenSelect = document.getElementById(`lenSelect-${i}`);
   if (!lenSelect) return;
   const lenType = lenSelect.value;
@@ -482,19 +496,31 @@ async function genFullArticle(i) {
   const contentDiv = document.getElementById(`full-content-${i}`);
   if (!fullDiv || !contentDiv) return;
   
+  // 检查缓存
   if (fullArticles[i] && fullArticles[i][lenType]) {
     contentDiv.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(fullArticles[i][lenType])}</div>`;
     fullDiv.style.display = 'block';
     return;
   }
+  
   fullDiv.style.display = 'block';
   contentDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 重新编辑报道中...</div>';
   
+  // 判断是事件格式还是新闻格式
   const isEvent = item.articles !== undefined;
   const eventTitle = isEvent ? item.event : item.title;
   const curTitle = document.getElementById(`ht-${i}`)?.innerText || eventTitle.slice(0, 25);
-  const allTitles = isEvent ? item.articles.map(a => a.title).join('\n') : item.title;
-  const prompt = `请将以下内容改写成一篇原创报道，字数${cfg.desc}。要求像第一手资料，客观叙述，避免评论。\n标题：${eventTitle}\n内容：${allTitles}\n已有标题：${curTitle}\n直接输出正文。`;
+  
+  // 构建提示词
+  let allTitles = '';
+  if (isEvent) {
+    allTitles = item.articles.map(a => a.title).join('\n');
+  } else {
+    allTitles = item.title;
+  }
+  
+  const prompt = `请将以下内容改写成一篇原创报道，字数${cfg.desc}。要求像第一手资料，客观叙述，避免评论。\n标题：${eventTitle}\n相关内容：${allTitles}\n已有标题：${curTitle}\n直接输出正文。`;
+  
   try {
     const article = await callDS([{ role: 'user', content: prompt }], cfg.maxTokens);
     let clean = article.replace(/```/g, '').trim();
@@ -504,14 +530,17 @@ async function genFullArticle(i) {
     fullArticles[i][lenType] = clean;
     contentDiv.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(clean)}</div>`;
   } catch (e) {
+    console.error('全文生成失败:', e);
     contentDiv.innerHTML = `<div class="err">生成失败：${e.message}</div>`;
   }
 }
 
 // 修改 genSheping 函数（兼容事件格式）
 async function genSheping(i) {
-  const item = window.eventCache ? window.eventCache[i] : newsCache[i];
+  // 优先从事件缓存读取
+  const item = window.eventCache ? window.eventCache[i] : (newsCache ? newsCache[i] : null);
   if (!item) return;
+  
   const lenSelect = document.getElementById(`shepLenSelect-${i}`);
   if (!lenSelect) return;
   const word = lenSelect.value;
@@ -530,8 +559,17 @@ async function genSheping(i) {
   
   const isEvent = item.articles !== undefined;
   const eventTitle = isEvent ? item.event : item.title;
-  const allTitles = isEvent ? item.articles.map(a => a.title).join('\n') : item.title;
-  const prompt = `根据以下内容撰写社评，字数${cfg.desc}，标题自拟。要求积极建设性，遵守法规。\n标题：${eventTitle}\n内容：${allTitles}\n输出标题+正文。`;
+  const curTitle = document.getElementById(`ht-${i}`)?.innerText || eventTitle.slice(0, 25);
+  
+  let allTitles = '';
+  if (isEvent) {
+    allTitles = item.articles.map(a => a.title).join('\n');
+  } else {
+    allTitles = item.title;
+  }
+  
+  const prompt = `根据以下内容撰写社评，字数${cfg.desc}，标题自拟。要求积极建设性，遵守法规，从行业/社会进步角度。\n标题：${eventTitle}\n内容：${allTitles}\n已有标题：${curTitle}\n输出标题+正文。`;
+  
   try {
     const article = await callDS([{ role: 'user', content: prompt }], cfg.maxTokens);
     if (article.length < 50) throw new Error('过短');
@@ -539,6 +577,7 @@ async function genSheping(i) {
     shepingCache[i][word] = article;
     contentDiv.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(article)}</div>`;
   } catch (e) {
+    console.error('社评生成失败:', e);
     contentDiv.innerHTML = `<div class="err">失败：${e.message}</div>`;
   }
 }
@@ -749,12 +788,16 @@ async function genSheping(i){
   }
 }
 
-function copyFullArticle(i){
+function copyFullArticle(i) {
   const len = document.getElementById(`lenSelect-${i}`)?.value;
-  if(!len) return;
+  if (!len) return;
   const content = fullArticles[i]?.[len];
-  if(content){ navigator.clipboard.writeText(content); alert('已复制全文'); }
-  else alert('请先生成全文');
+  if (content) { 
+    navigator.clipboard.writeText(content); 
+    alert('已复制全文'); 
+  } else { 
+    alert('请先生成全文'); 
+  }
 }
 function removeAiTone(text){
   return text
@@ -775,12 +818,16 @@ function removeAiTone(text){
     .replace(/\n{3,}/g,'\n\n')
     .trim();
 }
-function copySheping(i){
+function copySheping(i) {
   const len = document.getElementById(`shepLenSelect-${i}`)?.value;
-  if(!len) return;
+  if (!len) return;
   const content = shepingCache[i]?.[len];
-  if(content){ navigator.clipboard.writeText(content); alert('已复制社评'); }
-  else alert('请先生成社评');
+  if (content) { 
+    navigator.clipboard.writeText(content); 
+    alert('已复制社评'); 
+  } else { 
+    alert('请先生成社评'); 
+  }
 }
 function copyIt(i){
   const title = document.getElementById(`ht-${i}`)?.innerText || '';
