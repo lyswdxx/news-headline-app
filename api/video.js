@@ -1,73 +1,68 @@
 // ==========================================
-// 视频热点接口 - 多源备用版（无需 API Key）
+// 视频热点接口 - 支持关键词搜索
 // ==========================================
 
-// 方案1：使用 Invidious 公共实例（YouTube 镜像）
 const INVIDIOUS_INSTANCES = [
   'https://inv.riverside.rocks',
   'https://y.com.cm',
-  'https://invidious.snopyta.org',
-  'https://invidious.tiekoetter.com'
+  'https://invidious.snopyta.org'
 ];
 
-// 方案2：使用 Piped 实例（备用）
-const PIPED_INSTANCES = [
-  'https://piped.kavin.rocks',
-  'https://piped.snopyta.org'
-];
+// 兴趣词映射（根据分类推荐相关视频）
+const CATEGORY_KEYWORDS = {
+  '科技': 'technology',
+  '财经': 'finance',
+  '人工智能': 'artificial intelligence',
+  '体育': 'sports',
+  '健康': 'health',
+  '社会民生': 'news',
+  '汽车': 'car',
+  '教育': 'education',
+  '娱乐': 'entertainment',
+  '旅游': 'travel'
+};
 
-// 方案3：静态热点视频数据（最终兜底）
-const FALLBACK_VIDEOS = [
-  {
-    title: '【全网爆款】五一假期最火旅游地合集',
-    link: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-    channel: '旅游博主',
-    published: new Date().toISOString(),
-    description: '五一假期全国热门景点实况，人山人海太震撼了！',
-    thumbnail: 'https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
-  },
-  {
-    title: '特斯拉新款车型曝光，外观大升级',
-    link: 'https://www.youtube.com/watch?v=6n3pFFPSlW4',
-    channel: '科技前沿',
-    published: new Date().toISOString(),
-    description: '马斯克亲自站台，全新设计语言引发热议',
-    thumbnail: 'https://img.youtube.com/vi/6n3pFFPSlW4/hqdefault.jpg'
-  },
-  {
-    title: 'iPhone 16 Pro 开箱评测，值不值得买？',
-    link: 'https://www.youtube.com/watch?v=OpmH7SHTW2M',
-    channel: '数码评测',
-    published: new Date().toISOString(),
-    description: '全新A18芯片性能炸裂，相机升级太离谱',
-    thumbnail: 'https://img.youtube.com/vi/OpmH7SHTW2M/hqdefault.jpg'
-  },
-  {
-    title: '周杰伦演唱会现场，全场大合唱《七里香》',
-    link: 'https://www.youtube.com/watch?v=KKG5l3K0G6M',
-    channel: '娱乐现场',
-    published: new Date().toISOString(),
-    description: '粉丝泪崩！时隔多年再次听到这首歌',
-    thumbnail: 'https://img.youtube.com/vi/KKG5l3K0G6M/hqdefault.jpg'
-  },
-  {
-    title: 'AI 实时生成视频，电影工业要被颠覆了？',
-    link: 'https://www.youtube.com/watch?v=WJaxFpRMG5g',
-    channel: '科技观察',
-    published: new Date().toISOString(),
-    description: 'Sora 级模型落地，普通人也能做大片',
-    thumbnail: 'https://img.youtube.com/vi/WJaxFpRMG5g/hqdefault.jpg'
-  }
-];
-
-// 清理文本
 function cleanText(str) {
   if (!str) return '';
   return str.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
 
-// 尝试从 Invidious 获取
-async function fetchFromInvidious(region) {
+// 搜索 YouTube 视频（通过 Invidious）
+async function searchYouTube(query, limit = 10) {
+  if (!query) return [];
+  
+  for (const instance of INVIDIOUS_INSTANCES) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&sort=relevance`;
+      const res = await fetch(url, { 
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        signal: controller.signal 
+      });
+      clearTimeout(timeout);
+      
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        return data.filter(v => v.type === 'video').slice(0, limit).map(v => ({
+          title: cleanText(v.title).slice(0, 80),
+          link: `https://youtube.com/watch?v=${v.videoId}`,
+          channel: cleanText(v.author).slice(0, 50) || 'YouTube频道',
+          published: v.publishedText || new Date().toISOString(),
+          description: cleanText(v.description || '').slice(0, 200),
+          thumbnail: v.videoThumbnails?.[0]?.url || `https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`
+        }));
+      }
+    } catch (e) {
+      console.warn(`搜索失败 ${instance}:`, e.message);
+    }
+  }
+  return [];
+}
+
+// 获取热门视频（无关键词时）
+async function fetchTrending(region) {
   const regionMap = { US: 'US', JP: 'JP', KR: 'KR', GB: 'GB' };
   const code = regionMap[region] || 'US';
   
@@ -95,80 +90,77 @@ async function fetchFromInvidious(region) {
         }));
       }
     } catch (e) {
-      console.warn(`Invidious ${instance} 失败:`, e.message);
+      console.warn(`热门失败 ${instance}:`, e.message);
     }
   }
   return [];
 }
 
-// 尝试从 Piped 获取
-async function fetchFromPiped(region) {
-  const regionMap = { US: 'US', JP: 'JP', KR: 'KR', GB: 'GB' };
-  const code = regionMap[region] || 'US';
+// 兜底数据（根据关键词生成）
+function getFallbackVideos(keyword, region) {
+  const kw = keyword || region || '热点';
+  const videos = [];
   
-  for (const instance of PIPED_INSTANCES) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-      const url = `${instance}/api/v1/trending?region=${code}`;
-      const res = await fetch(url, { 
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-        signal: controller.signal 
-      });
-      clearTimeout(timeout);
-      
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        return data.slice(0, 12).map(v => ({
-          title: cleanText(v.title).slice(0, 80),
-          link: `https://youtube.com/watch?v=${v.url?.split('=')[1] || v.videoId}`,
-          channel: cleanText(v.uploaderName || v.author).slice(0, 50) || 'YouTube频道',
-          published: v.uploaded || new Date().toISOString(),
-          description: cleanText(v.description || '').slice(0, 200),
-          thumbnail: v.thumbnailUrl || `https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`
-        }));
-      }
-    } catch (e) {
-      console.warn(`Piped ${instance} 失败:`, e.message);
-    }
+  // 根据关键词生成相关视频标题
+  const titles = [
+    `${kw}最新动态，全网都在看`,
+    `${kw}深度解析，专家这样说`,
+    `${kw}背后的真相，太震撼了`,
+    `${kw}现场实拍，太真实了`,
+    `${kw}干货分享，建议收藏`
+  ];
+  
+  for (let i = 0; i < Math.min(5, titles.length); i++) {
+    videos.push({
+      title: titles[i],
+      link: '#',
+      channel: `${kw}频道`,
+      published: new Date().toISOString(),
+      description: `关于“${kw}”的最新视频，点击观看完整内容。`,
+      thumbnail: ''
+    });
   }
-  return [];
-}
-
-// 主获取函数
-async function fetchVideos(region) {
-  // 1. 尝试 Invidious
-  let videos = await fetchFromInvidious(region);
-  if (videos.length > 0) return videos;
-  
-  // 2. 尝试 Piped
-  videos = await fetchFromPiped(region);
-  if (videos.length > 0) return videos;
-  
-  // 3. 返回热点兜底数据（根据地区调整）
-  let fallback = [...FALLBACK_VIDEOS];
-  if (region === 'JP') {
-    fallback.unshift({ title: '【日本热搜】樱花季最新打卡景点', link: '#', channel: '日本旅游', published: new Date().toISOString(), description: '东京大阪京都热门地实拍', thumbnail: '' });
-  } else if (region === 'KR') {
-    fallback.unshift({ title: '【韩国热搜】BLACKPINK新歌预告', link: '#', channel: '韩流娱乐', published: new Date().toISOString(), description: '粉丝期待已久的回归', thumbnail: '' });
-  } else if (region === 'GB') {
-    fallback.unshift({ title: '【英国热搜】皇室最新动态', link: '#', channel: '英国新闻', published: new Date().toISOString(), description: '白金汉宫发布官方声明', thumbnail: '' });
-  }
-  
-  return fallback.slice(0, 8);
+  return videos;
 }
 
 // API 入口
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  const { region = 'US' } = req.query;
+  const { region = 'US', kw, topic } = req.query;
   
   try {
-    const videos = await fetchVideos(region);
-    res.status(200).json({ videos });
+    let videos = [];
+    
+    // 优先级1：用户输入的关键词
+    if (kw && kw.trim()) {
+      videos = await searchYouTube(kw.trim());
+      if (videos.length > 0) {
+        return res.status(200).json({ videos: videos.slice(0, 8) });
+      }
+    }
+    
+    // 优先级2：分类关键词（没有用户输入时）
+    if (topic && CATEGORY_KEYWORDS[topic]) {
+      videos = await searchYouTube(CATEGORY_KEYWORDS[topic]);
+      if (videos.length > 0) {
+        return res.status(200).json({ videos: videos.slice(0, 8) });
+      }
+    }
+    
+    // 优先级3：地区热门视频
+    videos = await fetchTrending(region);
+    if (videos.length > 0) {
+      return res.status(200).json({ videos: videos.slice(0, 8) });
+    }
+    
+    // 优先级4：兜底数据
+    const searchKw = kw || topic || region;
+    const fallback = getFallbackVideos(searchKw, region);
+    res.status(200).json({ videos: fallback });
+    
   } catch (err) {
     console.error('视频抓取失败:', err);
-    res.status(200).json({ videos: FALLBACK_VIDEOS.slice(0, 6) });
+    const fallback = getFallbackVideos('热点', region);
+    res.status(200).json({ videos: fallback });
   }
 }
