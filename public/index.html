@@ -326,22 +326,39 @@ async function genFullArticle(i){
   fullDiv.style.display = 'block';
   contentDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 重新编辑报道中...</div>';
   const curTitle = document.getElementById(`ht-${i}`)?.innerText || fallbackTitle(n);
-  const prompt = `你是一位资深记者。请将以下新闻信息改写为一篇原创的新闻报道，字数${cfg.desc}。要求：像第一手资料、现场报道，客观叙述事实，避免评论。结构：标题(可用已有的)、导语、正文分段、结尾背景补充。
-新闻标题：${n.title}
+  const prompt = `请将以下新闻改写成一篇适合直接发布的平台文章（类似今日头条风格）。
+
+要求：
+- 不要出现“记者、采访、业内人士”等词
+- 不要使用新闻播报腔（如“据了解”“值得注意的是”）
+- 像普通作者写的，语言自然
+- 多用口语化表达，但保持信息清晰
+- 不要分“导语/正文/结尾”标签
+- 不要出现AI写作痕迹
+
+字数：${cfg.desc}
+
+内容：
+标题：${n.title}
 摘要：${n.summary}
-来源：${n.source}
-已有标题：${curTitle}
 直接输出文章正文，不要额外标记。`;
   try{
-    const article = await callDS([{role:'user',content:prompt}], cfg.maxTokens);
-    const clean = article.replace(/```/g,'').trim();
-    if(clean.length<200) throw new Error('内容过短');
-    if(!fullArticles[i]) fullArticles[i]={};
-    fullArticles[i][lenType] = clean;
-    contentDiv.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(clean)}</div>`;
-  }catch(e){
-    contentDiv.innerHTML = `<div class="err">生成失败：${e.message}</div>`;
-  }
+	  const article = await callDS([{role:'user',content:prompt}], cfg.maxTokens);
+
+	  let clean = article.replace(/```/g,'').trim();
+
+	  // 🔥 去AI味
+	  clean = removeAiTone(clean);
+
+	  if(clean.length < 200) throw new Error('内容过短');
+
+	  if(!fullArticles[i]) fullArticles[i]={};
+	  fullArticles[i][lenType] = clean;
+
+	  contentDiv.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(clean)}</div>`;
+	}catch(e){
+	  contentDiv.innerHTML = `<div class="err">生成失败：${e.message}</div>`;
+	}
 }
 
 async function genSheping(i){
@@ -384,6 +401,14 @@ function copyFullArticle(i){
   const content = fullArticles[i]?.[len];
   if(content){ navigator.clipboard.writeText(content); alert('已复制全文'); }
   else alert('请先生成全文');
+}
+function removeAiTone(text){
+  return text
+    .replace(/记者.*?表示/g,'')
+    .replace(/业内人士.*?认为/g,'')
+    .replace(/据了解/g,'')
+    .replace(/值得注意的是/g,'')
+    .replace(/进一步来看/g,'')
 }
 function copySheping(i){
   const len = document.getElementById(`shepLenSelect-${i}`)?.value;
