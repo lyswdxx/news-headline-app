@@ -9,6 +9,16 @@
 body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:#f5f5f5;color:#1a1a1a;padding:24px 16px}
 .page{max-width:1000px;margin:0 auto}
 h1{font-size:20px;font-weight:600;margin-bottom:4px}
+.tag{
+  font-size:11px;
+  padding:2px 6px;
+  border-radius:4px;
+  margin-left:6px;
+}
+.tag-ok{
+  background:#e6f7ee;
+  color:#1aab6d;
+}
 .sub{font-size:13px;color:#888;margin-bottom:20px}
 .tab-bar{display:flex;gap:12px;margin-bottom:20px;border-bottom:1px solid #ddd}
 .tab-btn{padding:8px 20px;background:none;border:none;font-size:15px;cursor:pointer;color:#666}
@@ -181,6 +191,22 @@ async function fetchNews(topic, kw) {
   }
 }
 
+function cleanNewsData(news){
+  return news.map(n => ({
+    ...n,
+    title: stripHtml(n.title),
+    summary: stripHtml(n.summary)
+  }));
+}
+
+function stripHtml(str){
+  if(!str) return '';
+  return str
+    .replace(/<[^>]+>/g, '')   // 去HTML标签
+    .replace(/&[^;]+;/g, '')   // 去转义符
+    .trim();
+}
+
 function fallbackTitle(n){ let t=n.title; return t.length>25? t.slice(0,22)+'...' : t; }
 function fallbackHook(n){ let h=n.summary; return h.length>40? h.slice(0,37)+'...' : (h||'点击了解'); }
 
@@ -243,7 +269,8 @@ async function startNews(){
 
   try{
     let news = await fetchNews(topic, kw);
-
+	news = cleanNewsData(news);
+	
     // ✅ 双重兜底（关键）
     if(!news || news.length === 0){
       news = getFallbackNews(topic, kw);
@@ -328,13 +355,16 @@ async function genFullArticle(i){
   const curTitle = document.getElementById(`ht-${i}`)?.innerText || fallbackTitle(n);
   const prompt = `请将以下新闻改写成一篇适合直接发布的平台文章（类似今日头条风格）。
 
+写成类似今日头条/公众号文章：
+
 要求：
-- 不要出现“记者、采访、业内人士”等词
-- 不要使用新闻播报腔（如“据了解”“值得注意的是”）
-- 像普通作者写的，语言自然
-- 多用口语化表达，但保持信息清晰
-- 不要分“导语/正文/结尾”标签
-- 不要出现AI写作痕迹
+- 不能出现“记者、采访、业内人士”
+- 不要使用新闻播报腔
+- 像个人博主写的
+- 多用短句
+- 允许带一点情绪和观点，但不夸张
+- 不要出现总结套路句
+- 必须让读者感觉是人写的
 
 字数：${cfg.desc}
 
@@ -404,11 +434,24 @@ function copyFullArticle(i){
 }
 function removeAiTone(text){
   return text
-    .replace(/记者.*?表示/g,'')
-    .replace(/业内人士.*?认为/g,'')
+    // 删除典型AI新闻腔
+    .replace(/(记者|编辑).{0,10}?(表示|称)/g,'')
+    .replace(/业内人士.{0,10}?(认为|指出)/g,'')
     .replace(/据了解/g,'')
     .replace(/值得注意的是/g,'')
     .replace(/进一步来看/g,'')
+    .replace(/从某种程度上/g,'')
+
+    // 去掉总结句套路
+    .replace(/总的来看[,，]?/g,'')
+    .replace(/可以看出[,，]?/g,'')
+
+    // 去掉“官方口吻”
+    .replace(/相关方面表示/g,'')
+
+    // 清理多余空行
+    .replace(/\n{3,}/g,'\n\n')
+    .trim();
 }
 function copySheping(i){
   const len = document.getElementById(`shepLenSelect-${i}`)?.value;
