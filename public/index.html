@@ -176,26 +176,16 @@ function getFallbackNews(topic, kw){
 function escapeHtml(s){ if(!s) return ''; return s.replace(/[&<>]/g, m=> m==='&'?'&amp;': m==='<'?'&lt;':'&gt;'); }
 
 // ---------- 新闻相关 ----------
-async function fetchNews(topic, kw) {
-  try {
-    const params = new URLSearchParams({ topic, kw: kw||topic });
-    const res = await fetch('/api/news?'+params);
-
-    if(!res.ok) throw new Error('接口失败');
-
-    const d = await res.json();
-
-    // ✅ 兜底1：接口返回空
-    if(!d.news || !d.news.length){
-      return getFallbackNews(topic, kw);
-    }
-
-    return d.news;
-
-  } catch(e){
-    console.warn('接口失败，走本地兜底', e);
-    return getFallbackNews(topic, kw);
-  }
+async function fetchNews(topic, kw, limit = 10) {
+  const params = new URLSearchParams({ 
+    topic, 
+    kw: kw || topic,
+    limit: limit.toString()   // 默认返回 10 条，可根据需要修改数字
+  });
+  const res = await fetch('/api/news?' + params);
+  if (!res.ok) throw new Error('抓取失败');
+  const d = await res.json();
+  return d.news || [];
 }
 
 function cleanNewsData(news){
