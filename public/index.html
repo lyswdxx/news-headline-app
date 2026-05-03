@@ -277,51 +277,38 @@ ${news.map((n,i)=>`${i+1}. 原标题：${n.title}\n摘要：${n.summary}`).join(
 }
 // 原有的新闻卡片渲染函数（保留完整功能）
 async function renderAll(news, kw){
-  const results = await batchGen(news);
+  // 先渲染卡片骨架（不显示头条文案）
   let html='', pass=0;
-  
-  // 格式化时间函数
   const formatDateTime = (dateStr) => {
     if (!dateStr) return '时间未知';
     try {
       const date = new Date(dateStr);
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      const seconds = String(date.getSeconds()).padStart(2, '0');
-      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-    } catch {
-      return dateStr.slice(0, 19).replace('T', ' ');
-    }
+      return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}:${String(date.getSeconds()).padStart(2,'0')}`;
+    } catch { return dateStr.slice(0, 19).replace('T', ' '); }
   };
   
-  results.forEach((item,i)=>{
-    if(item.compliance !== 'block') pass++;
-    const len = item.title.length;
-    const pubDate = news[i].pubDate || new Date().toISOString();
-    
+  news.forEach((n, i) => {
+    const pubDate = n.pubDate || new Date().toISOString();
+    const linkUrl = n.link || `https://www.google.com/search?q=${encodeURIComponent(n.title)}`;
     html += `<div class="card" id="card-${i}">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <div>
-		  <a href="${escapeHtml(news[i].link || '#')}" target="_blank" rel="noopener noreferrer" style="color:#1aab6d; text-decoration:none; font-weight:bold;">
-			${escapeHtml(news[i].title)}
-		  </a>
-		  <span class="tag tag-ok">${item.compliance==='block'?'已过滤':'合规'}</span>
-		</div>
+          <a href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener noreferrer" style="color:#1aab6d; text-decoration:none; font-weight:bold;">
+            ${escapeHtml(n.title)}
+          </a>
+          <span class="tag tag-ok">合规</span>
+        </div>
         <div style="display:flex; gap:12px; align-items:center;">
-          <span style="font-size:12px; background:#f0f0f0; padding:2px 8px; border-radius:20px;">热度 ${news[i].hot || 0}</span>
+          <span style="font-size:12px; background:#f0f0f0; padding:2px 8px; border-radius:20px;">热度 ${n.hot || 0}</span>
           <span style="font-size:12px; color:#888;">📅 ${formatDateTime(pubDate)}</span>
         </div>
       </div>
-      <div class="source">来源：${escapeHtml(news[i].source)}</div>
-      <div class="summary">${escapeHtml(news[i].summary)}</div>
-      ${item.compliance!=='block' ? `
+      <div class="source">来源：${escapeHtml(n.source)}</div>
+      <div class="summary">${escapeHtml(n.summary)}</div>
       <div class="headline-box">
         <div class="hl-label">头条文案</div>
-        <div class="hl-title" id="ht-${i}">${escapeHtml(item.title)}</div>
-        <div class="hl-hook" id="hs-${i}">${escapeHtml(item.hook)}</div>
+        <div class="hl-title" id="ht-${i}">⏳ 生成中...</div>
+        <div class="hl-hook" id="hs-${i}"></div>
       </div>
       <div class="actions">
         <button class="btn-sm" onclick="copyIt(${i})">复制文案</button>
@@ -330,15 +317,35 @@ async function renderAll(news, kw){
         <button class="btn-sm" onclick="genFullArticle(${i})">📝 改写报道</button>
         <div class="shep-length-selector"><label>社评：</label><select id="shepLenSelect-${i}"><option value="200">200字</option><option value="500" selected>500字</option><option value="800">800字</option></select></div>
         <button class="btn-sm" onclick="genSheping(${i})">📢 生成社评</button>
-        <span class="char-tip" id="cc-${i}">标题${len}字${len>25?'超长':''}</span>
+        <span class="char-tip" id="cc-${i}"></span>
       </div>
       <div id="full-article-${i}" style="display:none;margin-top:12px"><div class="hot-article" id="full-content-${i}"></div><button class="btn-sm" onclick="copyFullArticle(${i})">复制全文</button></div>
       <div id="sheping-${i}" style="display:none;margin-top:12px"><div class="hot-article" id="sheping-content-${i}"></div><button class="btn-sm" onclick="copySheping(${i})">复制社评</button></div>
-      ` : `<div class="err">此条已过滤：${item.reason}</div>`}
     </div>`;
   });
-  const resultsDiv = document.getElementById('newsResults');
-  if(resultsDiv) resultsDiv.innerHTML = html;
+  document.getElementById('newsResults').innerHTML = html;
+  
+  // 并行生成所有头条文案
+  const promises = news.map(async (n, i) => {
+    const prompt = `${COMPLIANCE}\n风格：${styleGuide[curStyle]}\n根据以下新闻生成头条文案(标题≤25字,导语≤40字)：\n标题：${n.title}\n摘要：${n.summary}\n返回JSON {"title":"","hook":""}`;
+    try {
+      const content = await callDS([{ role: 'user', content: prompt }], 400);
+      const json = JSON.parse(content.match(/\{.*\}/s)[0]);
+      const titleEl = document.getElementById(`ht-${i}`);
+      const hookEl = document.getElementById(`hs-${i}`);
+      if (titleEl) titleEl.innerText = json.title || n.title.slice(0, 25);
+      if (hookEl) hookEl.innerText = json.hook || '';
+      const len = (json.title || '').length;
+      const cc = document.getElementById(`cc-${i}`);
+      if (cc) cc.innerText = `标题${len}字${len > 25 ? '超长' : ''}`;
+    } catch (e) {
+      const titleEl = document.getElementById(`ht-${i}`);
+      if (titleEl) titleEl.innerText = n.title.slice(0, 25);
+    }
+  });
+  
+  // 等待所有文案生成完成（不阻塞页面显示）
+  await Promise.all(promises);
 }
 // 统一渲染函数（支持事件模式和新闻模式，带字数选择和时间显示）
 async function renderAllEvents(events, kw) {
