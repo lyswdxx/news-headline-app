@@ -54,6 +54,7 @@ async function fetchGoogleNews(keyword) {
       let title = block.match(/<title>([\s\S]*?)<\/title>/)?.[1] || '';
       let summary = block.match(/<description>([\s\S]*?)<\/description>/)?.[1] || '';
       let pubDate = block.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] || '';
+	  let link = block.match(/<link>([\s\S]*?)<\/link>/)?.[1] || '';
       title = cleanText(title);
       summary = cleanText(summary);
       if (!title) return null;
@@ -82,7 +83,8 @@ async function fetchTianApi(apiPath) {
       summary: cleanText(item.description || item.content || '').slice(0, 150),
       source: item.source || '天行数据',
       hot: parseInt(item.hot) || 0,
-      pubDate: item.ctime ? new Date(item.ctime).toISOString() : new Date().toISOString()
+      pubDate: item.ctime ? new Date(item.ctime).toISOString() : new Date().toISOString(),
+      link: item.url || `https://www.google.com/search?q=${encodeURIComponent(cleanText(item.title))}`  // 👈 添加这一行
     }));
   } catch { return []; }
 }
@@ -104,7 +106,8 @@ async function fetchVvhanHot(source = 'weibo') {
       summary: `热度值 ${item.hot || '飙升中'}，网友热议。`,
       source: source === 'weibo' ? '微博热搜' : (source === 'zhihu' ? '知乎热榜' : '36氪热榜'),
       hot: parseInt(item.hot) || 0,
-      pubDate: new Date().toISOString()
+      pubDate: new Date().toISOString(),
+      link: item.url || `https://www.google.com/search?q=${encodeURIComponent(cleanText(item.title))}`  // 👈 添加这一行
     }));
   } catch { return []; }
 }
