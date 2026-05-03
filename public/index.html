@@ -3,668 +3,428 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>头条新闻合规生成 · 社评助手（可选字数）</title>
+<title>热点工坊 · 新闻深度改写 & 视频热点</title>
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:#f5f5f5;color:#1a1a1a;min-height:100vh}
-.page{max-width:920px;margin:0 auto;padding:24px 16px 60px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:#f5f5f5;color:#1a1a1a;padding:24px 16px}
+.page{max-width:1000px;margin:0 auto}
 h1{font-size:20px;font-weight:600;margin-bottom:4px}
 .sub{font-size:13px;color:#888;margin-bottom:20px}
-.panel{background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.07)}
+.tab-bar{display:flex;gap:12px;margin-bottom:20px;border-bottom:1px solid #ddd}
+.tab-btn{padding:8px 20px;background:none;border:none;font-size:15px;cursor:pointer;color:#666}
+.tab-btn.active{color:#1aab6d;border-bottom:2px solid #1aab6d;font-weight:500}
+.panel{background:#fff;border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,0.07)}
 .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-select,input[type=text]{height:38px;border:1px solid #ddd;border-radius:8px;padding:0 12px;font-size:14px;background:#fff;outline:none}
-select{min-width:110px}
-input[type=text]{flex:1;min-width:160px}
-input[type=text]:focus{border-color:#1aab6d}
-.btn-go{height:38px;padding:0 22px;background:#1aab6d;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap}
-.btn-go:disabled{background:#ccc;cursor:not-allowed}
-.tabs{display:flex;gap:6px;flex-wrap:wrap}
-.tab{font-size:12px;padding:5px 14px;border-radius:20px;cursor:pointer;border:1px solid #e0e0e0;background:#fff;color:#666}
-.tab.on{background:#1aab6d;color:#fff;border-color:#1aab6d}
-.notice{font-size:12px;color:#999;background:#f9f9f9;border-radius:8px;padding:8px 12px;margin-top:12px;line-height:1.7}
-.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.07)}
-.card.blocked{background:#fff5f5;border:1px solid #fcc}
-.card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px}
-.orig-title{font-size:15px;font-weight:500;line-height:1.5;flex:1}
-.tags{display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
-.tag{font-size:11px;padding:2px 8px;border-radius:20px}
-.tag-ok{background:#e6f9f0;color:#0a7a4a}
-.tag-block{background:#fde8e8;color:#c0392b}
-.tag-cat{background:#ede9fe;color:#5b21b6}
-.source{font-size:12px;color:#aaa;margin-bottom:8px}
-.summary{font-size:13px;color:#555;line-height:1.7;margin-bottom:10px}
-.compliance{font-size:12px;padding:6px 12px;border-radius:8px;background:#f5f5f5;margin-bottom:10px;display:flex;align-items:center;gap:6px}
-.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.dot-g{background:#1aab6d}
-.dot-r{background:#e74c3c}
-.headline-box{border-left:3px solid #1aab6d;padding:10px 14px;background:#f6fdf9;border-radius:0 8px 8px 0;margin-bottom:10px}
-.hl-label{font-size:11px;color:#aaa;margin-bottom:4px}
-.hl-title{font-size:15px;font-weight:600;color:#111;line-height:1.5}
-.hl-hook{font-size:13px;color:#444;margin-top:5px;line-height:1.6}
-.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
-.btn-sm{height:30px;padding:0 14px;font-size:12px;cursor:pointer;border:1px solid #ddd;border-radius:8px;background:#fff}
+select,input[type=text]{height:38px;border:1px solid #ddd;border-radius:8px;padding:0 12px;font-size:14px}
+.btn-go{height:38px;padding:0 22px;background:#1aab6d;color:#fff;border:none;border-radius:8px;font-weight:500;cursor:pointer}
+.btn-sm{height:30px;padding:0 14px;font-size:12px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer}
 .btn-sm:hover{background:#f5f5f5}
-.btn-full{background:#4a6fa5;color:#fff;border-color:#4a6fa5}
-.btn-full:hover{background:#3a5a8c}
-.btn-shep{background:#c0392b;color:#fff;border-color:#c0392b}
-.btn-shep:hover{background:#a93226}
-.full-article-box,.sheping-box{margin-top:12px;border-top:1px solid #eee;padding-top:12px;}
-.full-article-content,.sheping-content{background:#fafafa;border-radius:8px;padding:12px;font-size:13px;line-height:1.8;color:#2c3e50;white-space:pre-wrap;max-height:400px;overflow:auto}
-.full-actions,.sheping-actions{margin-top:8px;display:flex;gap:8px}
-.char-tip{font-size:11px;color:#aaa}
-.char-tip.over{color:#e74c3c}
-.loading{text-align:center;padding:40px;color:#888;font-size:14px}
+.loading{text-align:center;padding:40px;color:#888}
 .spinner{display:inline-block;width:18px;height:18px;border:2px solid #e0e0e0;border-top-color:#1aab6d;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
 @keyframes spin{to{transform:rotate(360deg)}}
-.err{background:#fde8e8;border-radius:8px;padding:12px 16px;font-size:13px;color:#c0392b;margin-bottom:12px}
-.empty{text-align:center;padding:60px 20px;color:#bbb;font-size:14px;line-height:2.2}
-.count{font-size:12px;color:#999;margin-bottom:12px}
-.block-tip{font-size:12px;color:#c0392b;padding-top:4px}
-.length-selector,.shep-length-selector{margin-left:auto; display:inline-flex; align-items:center; gap:6px; background:#f9f9f9; padding:4px 10px; border-radius:20px;}
-.length-selector label,.shep-length-selector label{font-size:11px; color:#666;}
-.length-selector select,.shep-length-selector select{height:26px; font-size:11px; padding:0 6px;}
-.custom-sheping {
-  background: #fff;
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 20px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
-}
-.custom-sheping h3 {
-  font-size: 16px;
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.custom-sheping textarea {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 14px;
-  font-family: inherit;
-  resize: vertical;
-  min-height: 100px;
-}
-.custom-sheping-actions {
-  margin-top: 10px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.custom-result {
-  margin-top: 12px;
-  background: #fafafa;
-  border-radius: 8px;
-  padding: 12px;
-  font-size: 13px;
-  line-height: 1.8;
-  white-space: pre-wrap;
-  display: none;
-}
+.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.07)}
+.video-card{display:flex;gap:12px;flex-wrap:wrap}
+.video-thumb{width:120px;height:68px;background:#eee;border-radius:8px;object-fit:cover}
+.video-info{flex:1;min-width:180px}
+.video-title{font-weight:500;margin-bottom:4px;font-size:14px}
+.video-meta{font-size:11px;color:#888;margin-bottom:8px}
+.video-desc{font-size:12px;color:#555;margin-bottom:8px}
+.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.char-tip{font-size:11px;color:#aaa}
+.err{background:#fde8e8;border-radius:8px;padding:12px;color:#c0392b;margin-bottom:12px}
+.empty{text-align:center;padding:60px;color:#bbb}
+.hot-article{background:#f6fdf9;border-left:3px solid #1aab6d;padding:10px;margin-top:10px;font-size:13px;white-space:pre-wrap}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tab{font-size:12px;padding:5px 14px;border-radius:20px;cursor:pointer;border:1px solid #e0e0e0;background:#fff;color:#666}
+.tab.on{background:#1aab6d;color:#fff;border-color:#1aab6d}
+.notice{font-size:12px;color:#999;background:#f9f9f9;border-radius:8px;padding:8px 12px;margin-bottom:12px}
+.length-selector,.shep-length-selector{display:inline-flex;align-items:center;gap:6px;background:#f9f9f9;padding:4px 10px;border-radius:20px}
+.length-selector select,.shep-length-selector select{height:26px;font-size:11px;padding:0 6px}
+.custom-sheping{background:#fff;border-radius:12px;padding:16px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,0.07)}
+.custom-sheping textarea{width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:14px;min-height:100px;resize:vertical}
 </style>
 </head>
 <body>
 <div class="page">
-  <h1>头条新闻合规生成 + 社评助手（可选字数）</h1>
-  <p class="sub">自动抓取国内前沿新闻 · 合规审核 · 生成头条文案 + 完整文章 + 深度社评（可自定义内容和字数）</p>
+  <h1>热点工坊 · 新闻深度改写 & 视频热点</h1>
+  <p class="sub">抓取新闻/视频元数据，重新编辑成第一手报道，可生成社评、长短文</p>
   
-  <!-- 自定义社评输入区（增加字数选项） -->
-  <div class="custom-sheping">
-    <h3>✍️ 自定义社评生成</h3>
-    <textarea id="customInput" placeholder="在此输入您想要评论的事件、观点或新闻内容，AI 将根据您提供的信息生成一篇符合规范的深度社评。"></textarea>
-    <div class="custom-sheping-actions">
-      <select id="customShepLen" style="width:100px;">
-        <option value="200">200字</option>
-        <option value="500" selected>500字</option>
-        <option value="800">800字</option>
-      </select>
-      <button class="btn-go" id="genCustomShepingBtn" style="background:#c0392b;">📢 生成社评</button>
-      <button class="btn-sm" id="copyCustomShepingBtn" style="display:none;">📋 复制社评</button>
-    </div>
-    <div id="customShepingResult" class="custom-result"></div>
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="news">📰 新闻改写</button>
+    <button class="tab-btn" data-tab="video">🎬 热门视频</button>
   </div>
-  
-  <div class="panel">
+
+  <!-- 新闻模式 -->
+  <div id="newsPanel" class="panel">
     <div class="row">
       <select id="topicSel">
-        <option value="科技">科技</option>
-        <option value="财经">财经</option>
-        <option value="人工智能">人工智能</option>
-        <option value="体育">体育</option>
-        <option value="健康">健康</option>
-        <option value="社会民生">民生</option>
-        <option value="汽车">汽车</option>
-        <option value="教育">教育</option>
-        <option value="娱乐">娱乐</option>
+        <option value="科技">科技</option><option value="财经">财经</option><option value="人工智能">人工智能</option>
+        <option value="体育">体育</option><option value="健康">健康</option><option value="社会民生">民生</option>
+        <option value="汽车">汽车</option><option value="教育">教育</option><option value="娱乐">娱乐</option>
       </select>
-      <input type="text" id="kwInput" placeholder="或输入关键词，如：新能源车、医保…"/>
-      <button class="btn-go" id="goBtn" onclick="start()">获取并生成</button>
+      <input type="text" id="kwInput" placeholder="输入关键词，如：五一旅游、新能源车"/>
+      <button class="btn-go" id="goNewsBtn">获取并生成</button>
     </div>
-    <div class="tabs">
-      <div class="tab on" data-s="popular" onclick="setStyle(this)">民生关怀</div>
-      <div class="tab" data-s="story" onclick="setStyle(this)">故事叙述</div>
-      <div class="tab" data-s="data" onclick="setStyle(this)">数据说话</div>
-      <div class="tab" data-s="guide" onclick="setStyle(this)">实用指南</div>
-      <div class="tab" data-s="analysis" onclick="setStyle(this)">深度解读</div>
+    <div class="tabs" id="styleTabs">
+      <div class="tab on" data-s="popular">民生关怀</div>
+      <div class="tab" data-s="story">故事叙述</div>
+      <div class="tab" data-s="data">数据说话</div>
+      <div class="tab" data-s="guide">实用指南</div>
+      <div class="tab" data-s="analysis">深度解读</div>
     </div>
-    <div class="notice">合规过滤：自动屏蔽政治敏感 · 标题25字内 · 去除AI痕迹 · 生成全文可选长短文 · 生成社评可选200/500/800字</div>
+    <div class="notice">✅ 合规过滤 · 标题≤25字 · 全文将改写为第一手报道 · 可生成社评（可选字数）</div>
+    <div id="newsResults"><div class="empty">选择分类或输入关键词，点击获取</div></div>
   </div>
-  <div id="errBox" style="display:none" class="err"></div>
-  <div id="countBar" class="count" style="display:none"></div>
-  <div id="results"><div class="empty">选择分类或输入关键词<br>点击「获取并生成」开始</div></div>
-</div>
-<script>
-let curStyle='popular', newsCache=[];
-let fullArticles = {};   // 存储全文 { newsId: { short, medium, long } }
-let shepingCache = {};   // 存储社评 { newsId: { 200: content, 500: content, 800: content } }
 
-const styleGuide={
-  popular:'民生关怀风格：关注普通人生活，语言亲切自然，突出与读者切身相关的内容，用"你""我们"拉近距离',
-  story:'故事叙述风格：以人物或事件为主线，有起承转合，读来有画面感，像在讲一个真实发生的故事',
-  data:'数据说话风格：用具体数字、对比、增幅说话，让读者一眼看到变化规模，数字必须来自原文',
-  guide:'实用指南风格：给读者明确的行动建议或知识要点，标题中有"怎么""如何""注意"等引导词',
-  analysis:'深度解读风格：剖析现象背后的原因与趋势，语气沉稳客观，适合有一定知识背景的读者'
+  <!-- 视频模式 -->
+  <div id="videoPanel" class="panel" style="display:none">
+    <div class="row">
+      <select id="videoRegion">
+        <option value="US">YouTube 全球热门</option>
+        <option value="JP">日本热门</option>
+        <option value="KR">韩国热门</option>
+        <option value="GB">英国热门</option>
+      </select>
+      <button class="btn-go" id="goVideoBtn">获取视频元数据</button>
+    </div>
+    <div class="notice">只获取标题、频道、链接等，不下载文件。点击“生成介绍文”可撰写发布文案。</div>
+    <div id="videoResults"><div class="empty">点击上方按钮获取最新热门视频</div></div>
+  </div>
+
+  <!-- 自定义社评区 -->
+  <div class="custom-sheping">
+    <h3 style="margin-bottom:8px">✍️ 自定义社评生成</h3>
+    <textarea id="customInput" placeholder="输入您想评论的事件或观点..."></textarea>
+    <div class="actions" style="margin-top:10px">
+      <select id="customShepLen"><option value="200">200字</option><option value="500" selected>500字</option><option value="800">800字</option></select>
+      <button class="btn-go" id="genCustomShepingBtn" style="background:#c0392b">📢 生成社评</button>
+      <button class="btn-sm" id="copyCustomShepingBtn" style="display:none">📋 复制</button>
+    </div>
+    <div id="customShepingResult" class="hot-article" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+let curStyle = 'popular';
+let newsCache = [];
+let fullArticles = {};   // { newsId: { short, medium, long } }
+let shepingCache = {};   // { newsId: { 200,500,800 } }
+let videoCache = [];
+let lastCustomSheping = {};
+
+const styleGuide = {
+  popular:'民生关怀风格：关注普通人生活，语言亲切自然',
+  story:'故事叙述风格：有起承转合，像在讲故事',
+  data:'数据说话风格：用具体数字、对比说话',
+  guide:'实用指南风格：给出明确行动建议',
+  analysis:'深度解读风格：剖析现象背后的原因'
 };
 
-const COMPLIANCE = `你是今日头条平台资深内容编辑，熟悉国内内容审核规定和平台规范。
+const COMPLIANCE = `你是资深内容编辑，严格遵守国内审核规定。必须屏蔽：攻击领导人、主权争议、谣言、宗教极端。允许境外科技/娱乐/体育等内容。标题≤25字，禁用震惊等标题党词汇，禁止AI腔。`;
 
-【必须屏蔽的内容 - 严格限制范围】
-- 直接攻击中国党政领导人、国家体制的内容
-- 涉及台湾、西藏、新疆、香港独立或主权争议的明确主张
-- 境外势力利用敏感事件攻击中国的明确言论
-- 未经官方证实的重大社会谣言、假新闻
-- 宗教极端、民族仇恨内容
-
-【允许通过的内容】
-- 普通科技新闻，包括境外科技公司动态、AI技术发展、产品发布、商业诉讼
-- 行业趋势分析、技术科普、应用案例
-- 不涉及中国政治的纯商业/科技内容，一律放行
-- 娱乐圈正常报道、体育赛事、健康科普、民生服务类内容
-
-【头条平台规范】
-- 标题不超过25字
-- 禁止"震惊""炸了"等标题党词汇
-- 禁止绝对化用语（最、第一等经官方背书除外）
-- 语言自然，避免"综上所述"等模板词
-- 绝不出现"AI生成"字样
-
-现在请按照以上宽松原则进行审核。`;
-
-function setStyle(el){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
-  el.classList.add('on');
-  curStyle=el.dataset.s;
-}
-
-async function callDS(messages, maxTokens = 2000){
+async function callDS(messages, maxTokens) {
   const r = await fetch('/api/claude', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      model:'deepseek-chat',
-      max_tokens: maxTokens,
-      messages
-    })
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ model:'deepseek-chat', max_tokens: maxTokens, messages })
   });
-  if(!r.ok){
-    const errText = await r.text();
-    console.error('API代理错误', r.status, errText);
-    throw new Error(`API错误 ${r.status}: ${errText.slice(0,100)}`);
-  }
-  const data = await r.json();
-  if(!data.choices || !data.choices.length){
-    console.error('API返回异常', data);
-    throw new Error('返回数据格式错误');
-  }
-  return data;
-}
-
-function getContent(d){
-  return (d.choices?.[0]?.message?.content || '').trim();
-}
-
-async function fetchNews(topic, kw){
-  const params = new URLSearchParams({topic, kw: kw || topic});
-  const r = await fetch('/api/news?'+params);
-  if(!r.ok) throw new Error('新闻抓取失败');
+  if(!r.ok) throw new Error(`API错误 ${r.status}`);
   const d = await r.json();
+  return d.choices?.[0]?.message?.content || '';
+}
+
+function escapeHtml(s){ if(!s) return ''; return s.replace(/[&<>]/g, m=> m==='&'?'&amp;': m==='<'?'&lt;':'&gt;'); }
+
+// ---------- 新闻相关 ----------
+async function fetchNews(topic, kw) {
+  const params = new URLSearchParams({ topic, kw: kw||topic });
+  const res = await fetch('/api/news?'+params);
+  if(!res.ok) throw new Error('抓取失败');
+  const d = await res.json();
   return d.news || [];
 }
 
-function fallbackTitle(news){
-  let title = news.title;
-  if(title.length > 25) title = title.slice(0,22)+'...';
-  return title;
-}
-function fallbackHook(news){
-  let hook = news.summary;
-  if(hook.length > 40) hook = hook.slice(0,37)+'...';
-  return hook || '点击了解更多详情';
-}
+function fallbackTitle(n){ let t=n.title; return t.length>25? t.slice(0,22)+'...' : t; }
+function fallbackHook(n){ let h=n.summary; return h.length>40? h.slice(0,37)+'...' : (h||'点击了解'); }
 
 async function batchGen(news){
-  const prompt = COMPLIANCE + '\n\n当前风格：' + styleGuide[curStyle] +
-    '\n\n对以下每条新闻进行合规审核并生成头条文案。返回严格JSON数组，不要markdown代码块：\n\n' +
-    news.map((n,i)=>(i+1)+'. 标题：'+n.title+'\n摘要：'+n.summary+'\n来源：'+n.source).join('\n\n') +
-    '\n\n返回格式示例：\n[{"compliance":"pass","reason":"真实可信","title":"25字内标题","hook":"40字内导语"},{"compliance":"block","reason":"敏感内容","title":"","hook":""}]\n\nblock时title和hook留空字符串。';
-
-  try{
-    const d = await callDS([{role:'user',content:prompt}], 1500);
-    const content = getContent(d);
-    let jsonStr = content;
-    const matchArr = content.match(/\[[\s\S]*\]/);
-    if(matchArr) jsonStr = matchArr[0];
-    else {
-      const first = content.indexOf('[');
-      const last = content.lastIndexOf(']');
-      if(first!==-1 && last!==-1) jsonStr = content.substring(first, last+1);
-    }
+  const prompt = `${COMPLIANCE}\n当前风格：${styleGuide[curStyle]}\n对以下每条新闻合规审核并生成头条文案(标题≤25字, 导语≤40字)。返回JSON数组：[{"compliance":"pass/block","reason":"","title":"","hook":""}]\n新闻:\n${news.map((n,i)=>`${i+1}.标题：${n.title}\n摘要：${n.summary}`).join('\n')}`;
+  try {
+    const content = await callDS([{role:'user',content:prompt}], 1500);
+    let jsonStr = content.match(/\[[\s\S]*\]/)?.[0] || content;
     let parsed = JSON.parse(jsonStr);
-    if(!Array.isArray(parsed)) throw new Error('不是数组');
-    while(parsed.length < news.length) parsed.push({compliance:'pass', reason:'自动通过', title:'', hook:''});
-    if(parsed.length > news.length) parsed = parsed.slice(0, news.length);
-    
-    return parsed.map((item, idx) => ({
-      compliance: item.compliance === 'block' ? 'block' : 'pass',
-      reason: item.reason || (item.compliance === 'block' ? '内容需过滤' : '合规'),
-      title: (item.title && item.title.trim()) ? item.title.trim() : fallbackTitle(news[idx]),
-      hook: (item.hook && item.hook.trim()) ? item.hook.trim() : fallbackHook(news[idx])
+    if(!Array.isArray(parsed)) throw new Error();
+    while(parsed.length < news.length) parsed.push({compliance:'pass',reason:'',title:'',hook:''});
+    return parsed.map((item,idx)=>({
+      compliance: item.compliance==='block'?'block':'pass',
+      reason: item.reason||'合规',
+      title: item.title?.trim() || fallbackTitle(news[idx]),
+      hook: item.hook?.trim() || fallbackHook(news[idx])
     }));
-  } catch(err){
-    console.error('batchGen 解析失败，使用兜底:', err);
-    return news.map(n => ({
-      compliance:'pass',
-      reason:'自动生成（解析失败）',
-      title: fallbackTitle(n),
-      hook: fallbackHook(n)
-    }));
+  } catch(e) {
+    return news.map(n=>({compliance:'pass',reason:'自动通过',title:fallbackTitle(n),hook:fallbackHook(n)}));
   }
-}
-
-async function start(){
-  const kw = document.getElementById('kwInput').value.trim();
-  const topic = document.getElementById('topicSel').value;
-  const keyword = kw || topic;
-  document.getElementById('errBox').style.display='none';
-  document.getElementById('countBar').style.display='none';
-  document.getElementById('goBtn').disabled=true;
-  document.getElementById('results').innerHTML='<div class="loading"><span class="spinner"></span>正在抓取最新新闻…</div>';
-  try{
-    const news = await fetchNews(topic, kw);
-    if(!news.length) throw new Error('暂无相关新闻，请换个关键词');
-    newsCache = news;
-    fullArticles = {};
-    shepingCache = {};
-    await renderAll(news, keyword);
-  }catch(e){
-    document.getElementById('errBox').textContent = e.message || '出错了，请重试';
-    document.getElementById('errBox').style.display='block';
-    document.getElementById('results').innerHTML='';
-  }
-  document.getElementById('goBtn').disabled=false;
 }
 
 async function renderAll(news, kw){
-  document.getElementById('results').innerHTML='<div class="loading"><span class="spinner"></span>合规审核 + 生成文案中…</div>';
   const results = await batchGen(news);
-  let html='', ok=0, blocked=0;
+  let html='', pass=0;
   results.forEach((item,i)=>{
-    const n = news[i];
-    const isBlock = item.compliance === 'block';
-    isBlock ? blocked++ : ok++;
-    const len = (item.title||'').length;
-    html += '<div class="card'+(isBlock?' blocked':'')+'" id="card-'+i+'">'+
-      '<div class="card-top"><div class="orig-title">'+escapeHtml(n.title)+'</div>'+
-      '<div class="tags"><span class="tag tag-cat">'+escapeHtml(kw)+'</span>'+
-      '<span class="tag '+(isBlock?'tag-block':'tag-ok')+'">'+(isBlock?'已过滤':'合规通过')+'</span></div></div>'+
-      '<div class="source">来源：'+(n.source||'综合')+'</div>'+
-      '<div class="summary">'+escapeHtml(n.summary||'')+'</div>'+
-      '<div class="compliance"><div class="dot '+(isBlock?'dot-r':'dot-g')+'"></div>'+
-      '<span style="color:'+(isBlock?'#c0392b':'#0a7a4a')+'">'+(item.reason||'')+'</span></div>'+
-      (!isBlock ?
-        '<div class="headline-box"><div class="hl-label">头条文案</div>'+
-        '<div class="hl-title" id="ht-'+i+'">'+escapeHtml(item.title)+'</div>'+
-        '<div class="hl-hook" id="hs-'+i+'">'+escapeHtml(item.hook)+'</div></div>'+
-        '<div class="actions">'+
-          '<button class="btn-sm" onclick="copyIt('+i+')">复制文案</button>'+
-          '<button class="btn-sm" onclick="regenOne('+i+')">换一版</button>'+
-          '<div class="length-selector">'+
-            '<label>全文：</label>'+
-            '<select id="lenSelect-'+i+'" onchange="updateTokenHint('+i+')">'+
-              '<option value="short">短文 (300-500字)</option>'+
-              '<option value="medium" selected>中篇 (600-800字)</option>'+
-              '<option value="long">长文 (1000-1500字)</option>'+
-            '</select>'+
-          '</div>'+
-          '<button class="btn-sm btn-full" onclick="genFullArticle('+i+')">📝 生成全文</button>'+
-          '<div class="shep-length-selector">'+
-            '<label>社评：</label>'+
-            '<select id="shepLenSelect-'+i+'">'+
-              '<option value="200">200字</option>'+
-              '<option value="500" selected>500字</option>'+
-              '<option value="800">800字</option>'+
-            '</select>'+
-          '</div>'+
-          '<button class="btn-sm btn-shep" onclick="genSheping('+i+')">📢 生成社评</button>'+
-          '<span class="char-tip'+(len>25?' over':'')+'" id="cc-'+i+'">标题'+len+'字'+(len>25?'（超长）':'')+'</span>'+
-        '</div>'+
-        '<div id="full-article-'+i+'" class="full-article-box" style="display:none;">'+
-          '<div class="full-article-content" id="full-content-'+i+'"></div>'+
-          '<div class="full-actions"><button class="btn-sm" onclick="copyFullArticle('+i+')">📋 复制全文</button></div>'+
-        '</div>'+
-        '<div id="sheping-'+i+'" class="sheping-box" style="display:none;">'+
-          '<div class="sheping-content" id="sheping-content-'+i+'"></div>'+
-          '<div class="sheping-actions"><button class="btn-sm" onclick="copySheping('+i+')">📋 复制社评</button></div>'+
-        '</div>'
-        : '<div class="block-tip">此条内容涉及敏感领域，不建议发布</div>')+
-      '</div>';
+    if(item.compliance !== 'block') pass++;
+    const len = item.title.length;
+    html += `<div class="card" id="card-${i}">
+      <div><strong>${escapeHtml(news[i].title)}</strong> <span class="tag tag-ok">${item.compliance==='block'?'已过滤':'合规'}</span></div>
+      <div class="source">来源：${news[i].source}</div>
+      <div class="summary">${escapeHtml(news[i].summary)}</div>
+      ${item.compliance!=='block' ? `
+      <div class="headline-box"><div class="hl-label">头条文案</div><div class="hl-title" id="ht-${i}">${escapeHtml(item.title)}</div><div class="hl-hook" id="hs-${i}">${escapeHtml(item.hook)}</div></div>
+      <div class="actions">
+        <button class="btn-sm" onclick="copyIt(${i})">复制文案</button>
+        <button class="btn-sm" onclick="regenOne(${i})">换一版</button>
+        <div class="length-selector"><label>全文：</label><select id="lenSelect-${i}"><option value="short">短文300-500</option><option value="medium" selected>中篇600-800</option><option value="long">长文1000-1500</option></select></div>
+        <button class="btn-sm" onclick="genFullArticle(${i})">📝 改写报道</button>
+        <div class="shep-length-selector"><label>社评：</label><select id="shepLenSelect-${i}"><option value="200">200字</option><option value="500" selected>500字</option><option value="800">800字</option></select></div>
+        <button class="btn-sm" onclick="genSheping(${i})">📢 生成社评</button>
+        <span class="char-tip" id="cc-${i}">标题${len}字${len>25?'超长':''}</span>
+      </div>
+      <div id="full-article-${i}" style="display:none;margin-top:12px"><div class="hot-article" id="full-content-${i}"></div><button class="btn-sm" onclick="copyFullArticle(${i})">复制全文</button></div>
+      <div id="sheping-${i}" style="display:none;margin-top:12px"><div class="hot-article" id="sheping-content-${i}"></div><button class="btn-sm" onclick="copySheping(${i})">复制社评</button></div>
+      ` : `<div class="err">此条已过滤：${item.reason}</div>`}
+    </div>`;
   });
-  document.getElementById('results').innerHTML = html;
-  document.getElementById('countBar').textContent = '共 '+news.length+' 条 · '+ok+' 条通过 · '+blocked+' 条过滤';
-  document.getElementById('countBar').style.display='block';
+  document.getElementById('newsResults').innerHTML = html;
+  document.getElementById('countBar').innerHTML = `通过 ${pass} 条，过滤 ${news.length-pass} 条`;
 }
 
-function escapeHtml(str){
-  if(!str) return '';
-  return str.replace(/[&<>]/g, function(m){
-    if(m === '&') return '&amp;';
-    if(m === '<') return '&lt;';
-    if(m === '>') return '&gt;';
-    return m;
-  });
+async function startNews(){
+  const kw = document.getElementById('kwInput').value.trim();
+  const topic = document.getElementById('topicSel').value;
+  document.getElementById('newsResults').innerHTML = '<div class="loading"><span class="spinner"></span> 抓取中...</div>';
+  try{
+    const news = await fetchNews(topic, kw);
+    if(!news.length) throw new Error('无新闻');
+    newsCache = news;
+    fullArticles = {};
+    shepingCache = {};
+    await renderAll(news, kw||topic);
+  }catch(e){
+    document.getElementById('newsResults').innerHTML = `<div class="err">${e.message}</div>`;
+  }
 }
 
 async function regenOne(i){
   const n = newsCache[i];
-  if(!n) return;
-  const titleEl = document.getElementById('ht-'+i);
-  const hookEl = document.getElementById('hs-'+i);
-  if(!titleEl || !hookEl) return;
-  titleEl.textContent = '生成中…';
-  hookEl.textContent = '';
-  const prompt = COMPLIANCE + '\n风格：'+styleGuide[curStyle]+
-    '\n\n为以下新闻重新生成一版不同思路的头条文案，不能与之前重复：\n标题：'+n.title+'\n摘要：'+n.summary+
-    '\n\n返回JSON（不要markdown代码块）：{"title":"标题25字内","hook":"导语40字内"}';
+  const titleEl = document.getElementById(`ht-${i}`), hookEl = document.getElementById(`hs-${i}`);
+  if(!titleEl) return;
+  titleEl.innerText = '生成中...';
+  const prompt = `${COMPLIANCE}\n风格：${styleGuide[curStyle]}\n重新生成头条文案(不同思路)：标题：${n.title}\n摘要：${n.summary}\n返回JSON {"title":"","hook":""}`;
   try{
-    const d = await callDS([{role:'user',content:prompt}], 400);
-    const content = getContent(d);
-    let jsonStr = content;
-    const brace = content.indexOf('{');
-    if(brace !== -1){
-      const end = content.lastIndexOf('}');
-      if(end !== -1) jsonStr = content.substring(brace, end+1);
-    }
-    const r = JSON.parse(jsonStr);
-    titleEl.textContent = r.title || fallbackTitle(n);
-    hookEl.textContent = r.hook || fallbackHook(n);
-    const len = (r.title||'').length;
-    const cc = document.getElementById('cc-'+i);
-    if(cc){
-      cc.textContent = '标题'+len+'字'+(len>25?'（超长）':'');
-      cc.className = 'char-tip'+(len>25?' over':'');
-    }
-    // 清除缓存的全文和社评（因为文案变了）
-    const fullDiv = document.getElementById('full-article-'+i);
-    if(fullDiv && fullDiv.style.display === 'block') fullDiv.style.display = 'none';
-    const shepDiv = document.getElementById('sheping-'+i);
-    if(shepDiv && shepDiv.style.display === 'block') shepDiv.style.display = 'none';
+    const content = await callDS([{role:'user',content:prompt}], 400);
+    const json = JSON.parse(content.match(/\{.*\}/s)[0]);
+    titleEl.innerText = json.title || fallbackTitle(n);
+    hookEl.innerText = json.hook || fallbackHook(n);
+    const len = (json.title||'').length;
+    const cc = document.getElementById(`cc-${i}`);
+    if(cc) cc.innerText = `标题${len}字${len>25?'超长':''}`;
+    // 清除缓存
+    const fullDiv = document.getElementById(`full-article-${i}`);
+    if(fullDiv) fullDiv.style.display = 'none';
+    const shepDiv = document.getElementById(`sheping-${i}`);
+    if(shepDiv) shepDiv.style.display = 'none';
     delete fullArticles[i];
-    if(shepingCache[i]) delete shepingCache[i];
-  }catch(err){
-    console.error('换一版失败', err);
-    titleEl.textContent = '生成失败，使用原文';
-    hookEl.textContent = fallbackHook(n);
-  }
+    delete shepingCache[i];
+  }catch(e){ titleEl.innerText = '生成失败'; hookEl.innerText = ''; }
 }
 
-// 全文长度配置
-function getLengthConfig(lengthType) {
-  switch(lengthType) {
-    case 'short': return { desc: '300-500字短文', maxTokens: 800 };
-    case 'long': return { desc: '1000-1500字长文', maxTokens: 2000 };
-    default: return { desc: '600-800字中篇', maxTokens: 1200 };
-  }
+function getLengthConfig(t){
+  if(t==='short') return {desc:'300-500字短文', maxTokens:800};
+  if(t==='long') return {desc:'1000-1500字长文', maxTokens:2000};
+  return {desc:'600-800字中篇', maxTokens:1200};
+}
+function getShepConfig(w){
+  if(w==='200') return {desc:'200字短评', maxTokens:400};
+  if(w==='800') return {desc:'800字长评', maxTokens:1200};
+  return {desc:'500字社评', maxTokens:800};
 }
 
-// 社评字数配置
-function getShepingConfig(wordCount) {
-  switch(wordCount) {
-    case '200': return { desc: '200字短评', maxTokens: 400 };
-    case '800': return { desc: '800字长评', maxTokens: 1200 };
-    default: return { desc: '500字社评', maxTokens: 800 };
-  }
-}
-
+// 全文改写为第一手报道
 async function genFullArticle(i){
   const n = newsCache[i];
-  if(!n) return;
-  const lengthSelect = document.getElementById('lenSelect-'+i);
-  if(!lengthSelect) return;
-  const lengthType = lengthSelect.value;
-  const lengthConfig = getLengthConfig(lengthType);
-  
-  if(fullArticles[i] && fullArticles[i][lengthType]){
-    const contentDiv = document.getElementById('full-content-'+i);
-    if(contentDiv) contentDiv.innerHTML = '<div style="white-space:pre-wrap;">'+escapeHtml(fullArticles[i][lengthType])+'</div>';
-    const box = document.getElementById('full-article-'+i);
-    if(box) box.style.display = 'block';
+  const lenSelect = document.getElementById(`lenSelect-${i}`);
+  const lenType = lenSelect.value;
+  const cfg = getLengthConfig(lenType);
+  if(fullArticles[i] && fullArticles[i][lenType]){
+    document.getElementById(`full-content-${i}`).innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(fullArticles[i][lenType])}</div>`;
+    document.getElementById(`full-article-${i}`).style.display = 'block';
     return;
   }
-  const box = document.getElementById('full-article-'+i);
-  const contentDiv = document.getElementById('full-content-'+i);
-  if(!box || !contentDiv) return;
+  const box = document.getElementById(`full-article-${i}`);
+  const contentDiv = document.getElementById(`full-content-${i}`);
   box.style.display = 'block';
-  contentDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 正在撰写'+lengthConfig.desc+'...</div>';
-  
-  const curTitle = document.getElementById('ht-'+i)?.innerText || fallbackTitle(n);
-  const curHook = document.getElementById('hs-'+i)?.innerText || fallbackHook(n);
-  const prompt = COMPLIANCE + '\n\n当前风格：'+styleGuide[curStyle]+
-    '\n\n请根据以下新闻，撰写一篇适合今日头条发布的深度文章，要求字数严格控制在'+lengthConfig.desc+'。要求：\n'+
-    '- 标题不超过25字（已提供），正文以提供的导语为开头进行扩展\n'+
-    '- 结构清晰，有开头、主体（分3-4个小标题）、结尾\n'+
-    '- 语言生动，像资深记者或自媒体大V写的，避免AI腔\n'+
-    '- 可补充常识性背景，不要编造数据\n'+
-    '- 最后加上一句引导互动的话（如“对此你怎么看？欢迎评论区聊聊”）\n\n'+
-    '新闻标题：'+n.title+'\n摘要：'+n.summary+'\n来源：'+n.source+
-    '\n\n头条文案（标题和导语）：\n标题：'+curTitle+'\n导语：'+curHook+
-    '\n\n请直接输出文章正文，不要包含“文章标题”等额外说明。';
-  
+  contentDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 重新编辑报道中...</div>';
+  const curTitle = document.getElementById(`ht-${i}`)?.innerText || fallbackTitle(n);
+  const prompt = `你是一位资深记者。请将以下新闻信息改写为一篇原创的新闻报道，字数${cfg.desc}。要求：像第一手资料、现场报道，客观叙述事实，避免评论。结构：标题(可用已有的)、导语、正文分段、结尾背景补充。
+新闻标题：${n.title}
+摘要：${n.summary}
+来源：${n.source}
+已有标题：${curTitle}
+直接输出文章正文，不要额外标记。`;
   try{
-    const d = await callDS([{role:'user',content:prompt}], lengthConfig.maxTokens);
-    let article = getContent(d);
-    article = article.replace(/```[a-z]*\n?/gi, '').replace(/^#+\s*/, '');
-    if(article.length < 200) throw new Error('生成内容过短');
-    if(!fullArticles[i]) fullArticles[i] = {};
-    fullArticles[i][lengthType] = article;
-    contentDiv.innerHTML = '<div style="white-space:pre-wrap;">'+escapeHtml(article)+'</div>';
-  }catch(err){
-    console.error('全文生成失败', err);
-    contentDiv.innerHTML = '<div class="err">生成失败：'+err.message+'，请重试</div>';
+    const article = await callDS([{role:'user',content:prompt}], cfg.maxTokens);
+    const clean = article.replace(/```/g,'').trim();
+    if(clean.length<200) throw new Error('内容过短');
+    if(!fullArticles[i]) fullArticles[i]={};
+    fullArticles[i][lenType] = clean;
+    contentDiv.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(clean)}</div>`;
+  }catch(e){
+    contentDiv.innerHTML = `<div class="err">生成失败：${e.message}</div>`;
   }
 }
 
+// 社评生成
 async function genSheping(i){
   const n = newsCache[i];
-  if(!n) return;
-  const shepLenSelect = document.getElementById('shepLenSelect-'+i);
-  if(!shepLenSelect) return;
-  const wordCount = shepLenSelect.value;  // '200', '500', '800'
-  const shepConfig = getShepingConfig(wordCount);
-  
-  // 检查缓存
-  if(shepingCache[i] && shepingCache[i][wordCount]){
-    const contentDiv = document.getElementById('sheping-content-'+i);
-    if(contentDiv) contentDiv.innerHTML = '<div style="white-space:pre-wrap;">'+escapeHtml(shepingCache[i][wordCount])+'</div>';
-    const box = document.getElementById('sheping-'+i);
-    if(box) box.style.display = 'block';
+  const lenSelect = document.getElementById(`shepLenSelect-${i}`);
+  const word = lenSelect.value;
+  const cfg = getShepConfig(word);
+  if(shepingCache[i] && shepingCache[i][word]){
+    document.getElementById(`sheping-content-${i}`).innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(shepingCache[i][word])}</div>`;
+    document.getElementById(`sheping-${i}`).style.display = 'block';
     return;
   }
-  const box = document.getElementById('sheping-'+i);
-  const contentDiv = document.getElementById('sheping-content-'+i);
-  if(!box || !contentDiv) return;
+  const box = document.getElementById(`sheping-${i}`);
+  const contentDiv = document.getElementById(`sheping-content-${i}`);
   box.style.display = 'block';
-  contentDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 正在撰写'+shepConfig.desc+'...</div>';
-  
-  const curTitle = document.getElementById('ht-'+i)?.innerText || fallbackTitle(n);
-  const prompt = `你是一位资深评论员，擅长从积极、建设性的角度对新闻事件进行评论，完全遵守国家法律法规和社会主义核心价值观，不讨论任何政治敏感话题，不批评现行政策，不涉及体制问题，只从行业发展、社会进步、科技创新、民生改善等正面角度发表观点。
-
-请根据以下新闻，撰写一篇短小精悍的社评，要求字数严格控制在${shepConfig.desc}（即约${wordCount}字），标题自拟（不超过20字），语言有观点、有逻辑，体现正能量和建设性。
-
+  contentDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 撰写社评...</div>';
+  const curTitle = document.getElementById(`ht-${i}`)?.innerText || fallbackTitle(n);
+  const prompt = `你是一位评论员。请根据以下新闻，撰写一篇社评，字数${cfg.desc}，标题自拟。要求：积极建设性，遵守法规，不批评体制，从行业/社会进步角度。避免“我认为”。
 新闻标题：${n.title}
-新闻摘要：${n.summary}
+摘要：${n.summary}
 来源：${n.source}
-头条文案标题：${curTitle}
-
-要求：
-- 不要重复新闻事实，重点在于评论和观点
-- 可赞扬行业的积极趋势、企业的创新精神、政策的利好影响等
-- 避免“我认为”“我觉得”，直接陈述观点
-- 禁止任何对政府、领导人的评论
-- 整体风格类似《人民日报》短评或行业观察
-- 最后可以用一句鼓励或展望未来作结
-
-输出格式：先输出标题（单独一行，可加粗），然后正文。不要出现“AI生成”字样。`;
-  
+已有标题：${curTitle}
+输出格式：标题一行，空一行，正文。`;
   try{
-    const d = await callDS([{role:'user',content:prompt}], shepConfig.maxTokens);
-    let article = getContent(d);
-    article = article.replace(/```[a-z]*\n?/gi, '').trim();
-    if(article.length < (wordCount/2)) throw new Error('生成内容过短');
-    if(!shepingCache[i]) shepingCache[i] = {};
-    shepingCache[i][wordCount] = article;
-    contentDiv.innerHTML = '<div style="white-space:pre-wrap;">'+escapeHtml(article)+'</div>';
-  }catch(err){
-    console.error('社评生成失败', err);
-    contentDiv.innerHTML = '<div class="err">生成失败：'+err.message+'，请重试</div>';
+    const article = await callDS([{role:'user',content:prompt}], cfg.maxTokens);
+    if(article.length<50) throw new Error('过短');
+    if(!shepingCache[i]) shepingCache[i]={};
+    shepingCache[i][word] = article;
+    contentDiv.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(article)}</div>`;
+  }catch(e){
+    contentDiv.innerHTML = `<div class="err">失败：${e.message}</div>`;
   }
 }
 
 function copyFullArticle(i){
-  const lengthSelect = document.getElementById('lenSelect-'+i);
-  if(!lengthSelect) return;
-  const lengthType = lengthSelect.value;
-  const content = fullArticles[i]?.[lengthType];
-  if(!content){ alert('请先生成对应长度的全文'); return; }
-  navigator.clipboard.writeText(content).then(()=>{
-    const btn = document.querySelector(`#full-article-${i} .full-actions button`);
-    if(btn){
-      const original = btn.innerText;
-      btn.innerText = '已复制 ✓';
-      setTimeout(()=> btn.innerText = original, 1500);
-    }
-  }).catch(()=>alert('复制失败，手动复制吧'));
+  const len = document.getElementById(`lenSelect-${i}`).value;
+  const content = fullArticles[i]?.[len];
+  if(content){ navigator.clipboard.writeText(content); alert('已复制全文'); }
+  else alert('请先生成全文');
 }
-
 function copySheping(i){
-  const shepLenSelect = document.getElementById('shepLenSelect-'+i);
-  if(!shepLenSelect) return;
-  const wordCount = shepLenSelect.value;
-  const content = shepingCache[i]?.[wordCount];
-  if(!content){ alert('请先生成社评'); return; }
-  navigator.clipboard.writeText(content).then(()=>{
-    const btn = document.querySelector(`#sheping-${i} .sheping-actions button`);
-    if(btn){
-      const original = btn.innerText;
-      btn.innerText = '已复制 ✓';
-      setTimeout(()=> btn.innerText = original, 1500);
-    }
-  }).catch(()=>alert('复制失败，手动复制吧'));
+  const len = document.getElementById(`shepLenSelect-${i}`).value;
+  const content = shepingCache[i]?.[len];
+  if(content){ navigator.clipboard.writeText(content); alert('已复制社评'); }
+  else alert('请先生成社评');
 }
-
 function copyIt(i){
-  const title = document.getElementById('ht-'+i)?.textContent || '';
-  const hook = document.getElementById('hs-'+i)?.textContent || '';
-  navigator.clipboard.writeText(hook ? title+'\n'+hook : title).then(()=>{
-    const btns = document.querySelectorAll(`#card-${i} .actions .btn-sm`);
-    const btn = btns[0];
-    if(btn){
-      const old = btn.textContent;
-      btn.textContent = '已复制 ✓';
-      setTimeout(()=> btn.textContent = old, 1500);
-    }
-  });
+  const title = document.getElementById(`ht-${i}`)?.innerText || '';
+  const hook = document.getElementById(`hs-${i}`)?.innerText || '';
+  navigator.clipboard.writeText(hook ? title+'\n'+hook : title);
+  alert('已复制头条文案');
 }
 
-function updateTokenHint(i) {}
-
-// 自定义社评生成（带字数选项）
-let lastCustomSheping = {};
-
-async function generateCustomSheping() {
-  const userInput = document.getElementById('customInput').value.trim();
-  if (!userInput) {
-    alert('请输入您想评论的内容');
-    return;
-  }
-  const wordSelect = document.getElementById('customShepLen');
-  const wordCount = wordSelect.value;
-  const config = getShepingConfig(wordCount);
-  
+// 自定义社评
+async function generateCustomSheping(){
+  const input = document.getElementById('customInput').value.trim();
+  if(!input) return alert('请输入内容');
+  const word = document.getElementById('customShepLen').value;
+  const cfg = getShepConfig(word);
   const btn = document.getElementById('genCustomShepingBtn');
   const resultDiv = document.getElementById('customShepingResult');
-  const copyBtn = document.getElementById('copyCustomShepingBtn');
-  btn.disabled = true;
-  btn.textContent = '生成中...';
+  btn.disabled = true; btn.innerText = '生成中...';
   resultDiv.style.display = 'block';
-  resultDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 正在撰写'+config.desc+'...</div>';
-  
-  const prompt = `你是一位资深评论员，擅长从积极、建设性的角度对事件进行评论，完全遵守国家法律法规和社会主义核心价值观，不讨论任何政治敏感话题，不批评现行政策，不涉及体制问题，只从行业发展、社会进步、科技创新、民生改善等正面角度发表观点。
-
-请根据用户提供的以下内容，撰写一篇社评，要求字数严格控制在${config.desc}（即约${wordCount}字），标题自拟（不超过20字），语言有观点、有逻辑，体现正能量和建设性。
-
-用户内容：
-${userInput}
-
-要求：
-- 不要重复用户内容，重点在于评论和观点
-- 可赞扬积极的趋势、创新精神、社会进步等
-- 避免“我认为”“我觉得”，直接陈述观点
-- 禁止任何对政府、领导人的评论
-- 整体风格类似《人民日报》短评或行业观察
-- 最后可以用一句鼓励或展望未来作结
-
-输出格式：先输出标题（单独一行，可加粗），然后正文。不要出现“AI生成”字样。`;
-
-  try {
-    const d = await callDS([{ role: 'user', content: prompt }], config.maxTokens);
-    let article = getContent(d);
-    article = article.replace(/```[a-z]*\n?/gi, '').trim();
-    if (article.length < 100) throw new Error('生成内容过短');
-    resultDiv.innerHTML = '<div style="white-space:pre-wrap;">' + escapeHtml(article) + '</div>';
-    copyBtn.style.display = 'inline-block';
-    lastCustomSheping[wordCount] = article;
-  } catch (err) {
-    console.error('自定义社评生成失败', err);
-    resultDiv.innerHTML = '<div class="err">生成失败：' + err.message + '，请重试</div>';
-    copyBtn.style.display = 'none';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '📢 生成社评';
-  }
+  resultDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 撰写社评...</div>';
+  const prompt = `你是一位评论员。根据用户内容撰写社评，字数${cfg.desc}，标题自拟。要求：积极建设性，不涉及政治体制。用户内容：${input}。输出标题+正文。`;
+  try{
+    const article = await callDS([{role:'user',content:prompt}], cfg.maxTokens);
+    resultDiv.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(article)}</div><button class="btn-sm" onclick="copyCustom()">复制</button>`;
+    lastCustomSheping[word] = article;
+    document.getElementById('copyCustomShepingBtn').style.display = 'inline-block';
+  }catch(e){
+    resultDiv.innerHTML = `<div class="err">失败：${e.message}</div>`;
+  } finally { btn.disabled = false; btn.innerText = '📢 生成社评'; }
+}
+function copyCustom(){
+  const word = document.getElementById('customShepLen').value;
+  const content = lastCustomSheping[word];
+  if(content) navigator.clipboard.writeText(content);
 }
 
-function copyCustomSheping() {
-  const wordSelect = document.getElementById('customShepLen');
-  const wordCount = wordSelect.value;
-  const content = lastCustomSheping[wordCount];
-  if (content) {
-    navigator.clipboard.writeText(content).then(() => {
-      const copyBtn = document.getElementById('copyCustomShepingBtn');
-      const original = copyBtn.textContent;
-      copyBtn.textContent = '已复制 ✓';
-      setTimeout(() => copyBtn.textContent = original, 1500);
-    }).catch(() => alert('复制失败，手动复制吧'));
-  } else {
-    alert('没有可复制的社评，请先生成');
-  }
+// 视频模式
+async function fetchVideos(region){
+  const res = await fetch(`/api/video?region=${region}`);
+  if(!res.ok) throw new Error('视频抓取失败');
+  const d = await res.json();
+  return d.videos || [];
 }
+async function renderVideos(videos){
+  let html='';
+  videos.forEach((v,i)=>{
+    html += `<div class="card" id="video-card-${i}">
+      <div class="video-card">
+        ${v.thumbnail?`<img class="video-thumb" src="${escapeHtml(v.thumbnail)}" referrerpolicy="no-referrer">`:'<div class="video-thumb"></div>'}
+        <div class="video-info">
+          <div class="video-title"><a href="${escapeHtml(v.link)}" target="_blank">${escapeHtml(v.title)}</a></div>
+          <div class="video-meta">${escapeHtml(v.channel)} · ${v.published?.split('T')[0]||''}</div>
+          <div class="video-desc">${escapeHtml(v.description||'')}</div>
+          <div class="actions">
+            <button class="btn-sm" onclick="genVideoArticle(${i})">📝 生成介绍文</button>
+            <div id="video-art-${i}" class="hot-article" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  });
+  document.getElementById('videoResults').innerHTML = html;
+  videoCache = videos;
+}
+async function genVideoArticle(idx){
+  const v = videoCache[idx];
+  const container = document.getElementById(`video-art-${idx}`);
+  container.style.display = 'block';
+  container.innerHTML = '<div class="loading"><span class="spinner"></span> 生成中...</div>';
+  const prompt = `根据视频信息写一篇150-200字的介绍文，用于发布：\n标题：${v.title}\n频道：${v.channel}\n描述：${v.description||'无'}\n输出短文。`;
+  try{
+    const text = await callDS([{role:'user',content:prompt}], 500);
+    container.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(text)}</div><button class="btn-sm" onclick="copyTextFromEl(this)">复制</button>`;
+  }catch(e){ container.innerHTML = `<div class="err">失败</div>`; }
+}
+function copyTextFromEl(btn){ const txt = btn.previousSibling.innerText; navigator.clipboard.writeText(txt); alert('已复制'); }
 
-document.getElementById('kwInput').addEventListener('keydown', e=>{ if(e.key==='Enter') start(); });
+// 事件绑定
+document.getElementById('goNewsBtn').addEventListener('click', startNews);
+document.getElementById('goVideoBtn').addEventListener('click', async()=>{
+  const region = document.getElementById('videoRegion').value;
+  document.getElementById('videoResults').innerHTML = '<div class="loading"><span class="spinner"></span> 获取中...</div>';
+  try{ const videos = await fetchVideos(region); await renderVideos(videos); }
+  catch(e){ document.getElementById('videoResults').innerHTML = `<div class="err">${e.message}</div>`; }
+});
 document.getElementById('genCustomShepingBtn').addEventListener('click', generateCustomSheping);
-document.getElementById('copyCustomShepingBtn').addEventListener('click', copyCustomSheping);
+document.getElementById('copyCustomShepingBtn').addEventListener('click', copyCustom);
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('newsPanel').style.display = btn.dataset.tab==='news'?'block':'none';
+    document.getElementById('videoPanel').style.display = btn.dataset.tab==='video'?'block':'none';
+  });
+});
+document.querySelectorAll('#styleTabs .tab').forEach(t=>{
+  t.addEventListener('click',function(){
+    document.querySelectorAll('#styleTabs .tab').forEach(x=>x.classList.remove('on'));
+    this.classList.add('on');
+    curStyle = this.dataset.s;
+  });
+});
 </script>
 </body>
 </html>
