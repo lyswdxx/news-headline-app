@@ -1,5 +1,5 @@
 // ==========================================
-// 热点聚合接口 - 确保返回 pubDate
+// 热点聚合接口 - 返回前端期望的 news 格式
 // ==========================================
 
 const API_BASE = 'https://apis.tianapi.com';
@@ -39,8 +39,6 @@ function cleanText(str) {
   return text;
 }
 
-// ========== 多源数据采集（都带 pubDate） ==========
-
 // Google 新闻
 async function fetchGoogleNews(keyword) {
   if (!keyword) return [];
@@ -54,6 +52,7 @@ async function fetchGoogleNews(keyword) {
       let title = block.match(/<title>([\s\S]*?)<\/title>/)?.[1] || '';
       let summary = block.match(/<description>([\s\S]*?)<\/description>/)?.[1] || '';
       let pubDate = block.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] || '';
+      let link = block.match(/<link>([\s\S]*?)<\/link>/)?.[1] || '';
       title = cleanText(title);
       summary = cleanText(summary);
       if (!title) return null;
@@ -62,7 +61,8 @@ async function fetchGoogleNews(keyword) {
         summary: summary.slice(0, 150), 
         source: 'Google新闻', 
         hot: 0,
-        pubDate: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString()
+        pubDate: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+        link: link || `https://www.google.com/search?q=${encodeURIComponent(title)}`
       };
     }).filter(Boolean);
   } catch { return []; }
@@ -82,7 +82,8 @@ async function fetchTianApi(apiPath) {
       summary: cleanText(item.description || item.content || '').slice(0, 150),
       source: item.source || '天行数据',
       hot: parseInt(item.hot) || 0,
-      pubDate: item.ctime ? new Date(item.ctime).toISOString() : new Date().toISOString()
+      pubDate: item.ctime ? new Date(item.ctime).toISOString() : new Date().toISOString(),
+      link: item.url || `https://www.google.com/search?q=${encodeURIComponent(cleanText(item.title))}`
     }));
   } catch { return []; }
 }
@@ -104,12 +105,13 @@ async function fetchVvhanHot(source = 'weibo') {
       summary: `热度值 ${item.hot || '飙升中'}，网友热议。`,
       source: source === 'weibo' ? '微博热搜' : (source === 'zhihu' ? '知乎热榜' : '36氪热榜'),
       hot: parseInt(item.hot) || 0,
-      pubDate: new Date().toISOString()
+      pubDate: new Date().toISOString(),
+      link: item.url || `https://www.google.com/search?q=${encodeURIComponent(cleanText(item.title))}`
     }));
   } catch { return []; }
 }
 
-// ========== 辅助函数 ==========
+// 去重
 function dedupeNews(news) {
   const map = new Map();
   for (const n of news) {
@@ -119,6 +121,7 @@ function dedupeNews(news) {
   return Array.from(map.values());
 }
 
+// 相似度
 function similarity(a, b) {
   const s1 = a.replace(/\s/g, '');
   const s2 = b.replace(/\s/g, '');
@@ -127,6 +130,7 @@ function similarity(a, b) {
   return same / Math.max(s1.length, s2.length);
 }
 
+// 事件聚类
 function clusterNews(newsList) {
   const groups = [];
   for (const n of newsList) {
@@ -143,6 +147,7 @@ function clusterNews(newsList) {
   return groups;
 }
 
+// 热度评分
 function calcScore(group) {
   let score = group.length * 15;
   for (const n of group) {
@@ -154,37 +159,40 @@ function calcScore(group) {
   return score;
 }
 
-// 兜底数据（带时间）
-function getFallbackEvents(topic, kw) {
+// 兜底数据
+function getFallbackNews(topic, kw) {
   const searchKey = kw || topic || '热点';
   const now = new Date().toISOString();
   return [
     {
-      event: `${searchKey}最新动态，全网关注`,
-      heat: 85,
-      count: 1,
-      articles: [{ title: `${searchKey}相关话题讨论量持续上升`, summary: '', source: '热点聚合', hot: 85, pubDate: now }],
-      pubDate: now
+      title: `${searchKey}最新动态，全网关注`,
+      summary: `关于“${searchKey}”的讨论量持续上升，热度飙升。`,
+      source: '热点聚合',
+      hot: 85,
+      pubDate: now,
+      link: `https://www.google.com/search?q=${encodeURIComponent(searchKey)}`
     },
     {
-      event: `${searchKey}引发热议，网友纷纷讨论`,
-      heat: 72,
-      count: 1,
-      articles: [{ title: `${searchKey}事件持续发酵，多方回应`, summary: '', source: '热点聚合', hot: 72, pubDate: now }],
-      pubDate: now
+      title: `${searchKey}引发热议，网友纷纷讨论`,
+      summary: `“${searchKey}”事件持续发酵，多方回应。`,
+      source: '热点聚合',
+      hot: 72,
+      pubDate: now,
+      link: `https://www.google.com/search?q=${encodeURIComponent(searchKey)}`
     },
     {
-      event: `${searchKey}最新进展汇总`,
-      heat: 65,
-      count: 1,
-      articles: [{ title: `${searchKey}多个角度深度解析`, summary: '', source: '热点聚合', hot: 65, pubDate: now }],
-      pubDate: now
+      title: `${searchKey}最新进展汇总`,
+      summary: `从多个角度深度解析“${searchKey}”的来龙去脉。`,
+      source: '热点聚合',
+      hot: 65,
+      pubDate: now,
+      link: `https://www.google.com/search?q=${encodeURIComponent(searchKey)}`
     }
   ];
 }
 
-// ========== 主聚合 ==========
-async function aggregateEvents({ topic, kw }) {
+// 主聚合函数 - 返回前端期望的 news 数组格式
+async function aggregateNews({ topic, kw }) {
   let allNews = [];
   const promises = [];
   
@@ -203,31 +211,31 @@ async function aggregateEvents({ topic, kw }) {
     }
   }
   
-  if (allNews.length === 0) return [];
+  if (allNews.length === 0) return getFallbackNews(topic, kw);
   
+  // 去重
   const deduped = dedupeNews(allNews);
+  
+  // 聚类后展平为新闻列表（每个事件取第一条作为代表，保持热点排序）
   const clusters = clusterNews(deduped);
-  const events = clusters.map(group => {
-    let latestDate = '';
-    for (const item of group) {
-      if (item.pubDate && item.pubDate > latestDate) latestDate = item.pubDate;
-    }
-    return {
-      event: group[0].title,
-      heat: calcScore(group),
-      count: group.length,
-      articles: group.map(a => ({
-        title: a.title,
-        summary: a.summary,
-        source: a.source,
-        hot: a.hot,
-        pubDate: a.pubDate || new Date().toISOString()
-      })),
-      pubDate: latestDate || new Date().toISOString()
-    };
-  });
-  events.sort((a, b) => b.heat - a.heat);
-  return events;
+  const sortedClusters = clusters.sort((a, b) => calcScore(b) - calcScore(a));
+  
+  // 转换为前端期望的 news 格式
+  const newsList = [];
+  for (const cluster of sortedClusters) {
+    // 取每个事件中热度最高的那条新闻
+    const bestNews = cluster.sort((a, b) => (b.hot || 0) - (a.hot || 0))[0];
+    newsList.push({
+      title: bestNews.title,
+      summary: bestNews.summary,
+      source: bestNews.source,
+      hot: bestNews.hot + cluster.length * 10, // 热度 = 原热度 + 事件聚合数量加成
+      pubDate: bestNews.pubDate,
+      link: bestNews.link
+    });
+  }
+  
+  return newsList.slice(0, 6);
 }
 
 // ========== API 入口 ==========
@@ -236,13 +244,10 @@ export default async function handler(req, res) {
   const { topic, kw } = req.query;
   
   try {
-    let events = await aggregateEvents({ topic, kw });
-    if (events.length === 0) {
-      events = getFallbackEvents(topic, kw);
-    }
-    res.status(200).json({ events: events.slice(0, 6) });
+    const news = await aggregateNews({ topic, kw });
+    res.status(200).json({ news });
   } catch (err) {
     console.error('聚合失败:', err);
-    res.status(200).json({ events: getFallbackEvents(topic, kw) });
+    res.status(200).json({ news: getFallbackNews(topic, kw) });
   }
 }
