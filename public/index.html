@@ -191,13 +191,16 @@ async function renderAll(news, kw){
       ` : `<div class="err">此条已过滤：${item.reason}</div>`}
     </div>`;
   });
-  document.getElementById('newsResults').innerHTML = html;
+  const resultsDiv = document.getElementById('newsResults');
+  if(resultsDiv) resultsDiv.innerHTML = html;
 }
 
 async function startNews(){
   const kw = document.getElementById('kwInput').value.trim();
   const topic = document.getElementById('topicSel').value;
-  document.getElementById('newsResults').innerHTML = '<div class="loading"><span class="spinner"></span> 抓取中...</div>';
+  const resultsDiv = document.getElementById('newsResults');
+  if(!resultsDiv) return;
+  resultsDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 抓取中...</div>';
   try{
     const news = await fetchNews(topic, kw);
     if(!news.length) throw new Error('无新闻');
@@ -206,7 +209,7 @@ async function startNews(){
     shepingCache = {};
     await renderAll(news, kw||topic);
   }catch(e){
-    document.getElementById('newsResults').innerHTML = `<div class="err">${e.message}</div>`;
+    resultsDiv.innerHTML = `<div class="err">${e.message}</div>`;
   }
 }
 
@@ -220,7 +223,7 @@ async function regenOne(i){
     const content = await callDS([{role:'user',content:prompt}], 400);
     const json = JSON.parse(content.match(/\{.*\}/s)[0]);
     titleEl.innerText = json.title || fallbackTitle(n);
-    hookEl.innerText = json.hook || fallbackHook(n);
+    if(hookEl) hookEl.innerText = json.hook || fallbackHook(n);
     const len = (json.title||'').length;
     const cc = document.getElementById(`cc-${i}`);
     if(cc) cc.innerText = `标题${len}字${len>25?'超长':''}`;
@@ -231,7 +234,7 @@ async function regenOne(i){
     if(shepDiv) shepDiv.style.display = 'none';
     delete fullArticles[i];
     delete shepingCache[i];
-  }catch(e){ titleEl.innerText = '生成失败'; hookEl.innerText = ''; }
+  }catch(e){ titleEl.innerText = '生成失败'; if(hookEl) hookEl.innerText = ''; }
 }
 
 function getLengthConfig(t){
@@ -251,15 +254,15 @@ async function genFullArticle(i){
   if(!lenSelect) return;
   const lenType = lenSelect.value;
   const cfg = getLengthConfig(lenType);
+  const fullDiv = document.getElementById(`full-article-${i}`);
+  const contentDiv = document.getElementById(`full-content-${i}`);
+  if(!fullDiv || !contentDiv) return;
   if(fullArticles[i] && fullArticles[i][lenType]){
-    document.getElementById(`full-content-${i}`).innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(fullArticles[i][lenType])}</div>`;
-    document.getElementById(`full-article-${i}`).style.display = 'block';
+    contentDiv.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(fullArticles[i][lenType])}</div>`;
+    fullDiv.style.display = 'block';
     return;
   }
-  const box = document.getElementById(`full-article-${i}`);
-  const contentDiv = document.getElementById(`full-content-${i}`);
-  if(!box || !contentDiv) return;
-  box.style.display = 'block';
+  fullDiv.style.display = 'block';
   contentDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 重新编辑报道中...</div>';
   const curTitle = document.getElementById(`ht-${i}`)?.innerText || fallbackTitle(n);
   const prompt = `你是一位资深记者。请将以下新闻信息改写为一篇原创的新闻报道，字数${cfg.desc}。要求：像第一手资料、现场报道，客观叙述事实，避免评论。结构：标题(可用已有的)、导语、正文分段、结尾背景补充。
@@ -286,15 +289,15 @@ async function genSheping(i){
   if(!lenSelect) return;
   const word = lenSelect.value;
   const cfg = getShepConfig(word);
+  const shepDiv = document.getElementById(`sheping-${i}`);
+  const contentDiv = document.getElementById(`sheping-content-${i}`);
+  if(!shepDiv || !contentDiv) return;
   if(shepingCache[i] && shepingCache[i][word]){
-    document.getElementById(`sheping-content-${i}`).innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(shepingCache[i][word])}</div>`;
-    document.getElementById(`sheping-${i}`).style.display = 'block';
+    contentDiv.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(shepingCache[i][word])}</div>`;
+    shepDiv.style.display = 'block';
     return;
   }
-  const box = document.getElementById(`sheping-${i}`);
-  const contentDiv = document.getElementById(`sheping-content-${i}`);
-  if(!box || !contentDiv) return;
-  box.style.display = 'block';
+  shepDiv.style.display = 'block';
   contentDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 撰写社评...</div>';
   const curTitle = document.getElementById(`ht-${i}`)?.innerText || fallbackTitle(n);
   const prompt = `你是一位评论员。请根据以下新闻，撰写一篇社评，字数${cfg.desc}，标题自拟。要求：积极建设性，遵守法规，不批评体制，从行业/社会进步角度。避免“我认为”。
@@ -315,13 +318,15 @@ async function genSheping(i){
 }
 
 function copyFullArticle(i){
-  const len = document.getElementById(`lenSelect-${i}`).value;
+  const len = document.getElementById(`lenSelect-${i}`)?.value;
+  if(!len) return;
   const content = fullArticles[i]?.[len];
   if(content){ navigator.clipboard.writeText(content); alert('已复制全文'); }
   else alert('请先生成全文');
 }
 function copySheping(i){
-  const len = document.getElementById(`shepLenSelect-${i}`).value;
+  const len = document.getElementById(`shepLenSelect-${i}`)?.value;
+  if(!len) return;
   const content = shepingCache[i]?.[len];
   if(content){ navigator.clipboard.writeText(content); alert('已复制社评'); }
   else alert('请先生成社评');
@@ -341,6 +346,7 @@ async function generateCustomSheping(){
   const cfg = getShepConfig(word);
   const btn = document.getElementById('genCustomShepingBtn');
   const resultDiv = document.getElementById('customShepingResult');
+  if(!resultDiv) return;
   btn.disabled = true; btn.innerText = '生成中...';
   resultDiv.style.display = 'block';
   resultDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 撰写社评...</div>';
@@ -349,7 +355,8 @@ async function generateCustomSheping(){
     const article = await callDS([{role:'user',content:prompt}], cfg.maxTokens);
     resultDiv.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(article)}</div><button class="btn-sm" onclick="copyCustom()">复制</button>`;
     lastCustomSheping[word] = article;
-    document.getElementById('copyCustomShepingBtn').style.display = 'inline-block';
+    const copyBtn = document.getElementById('copyCustomShepingBtn');
+    if(copyBtn) copyBtn.style.display = 'inline-block';
   }catch(e){
     resultDiv.innerHTML = `<div class="err">失败：${e.message}</div>`;
   } finally { btn.disabled = false; btn.innerText = '📢 生成社评'; }
@@ -360,7 +367,7 @@ function copyCustom(){
   if(content) navigator.clipboard.writeText(content);
 }
 
-// ---------- 视频模式（带多重备用） ----------
+// ---------- 视频模式 ----------
 async function fetchVideos(region){
   try{
     const res = await fetch(`/api/video?region=${region}`);
@@ -370,10 +377,9 @@ async function fetchVideos(region){
     throw new Error('no videos');
   }catch(e){
     console.warn('API失败，使用模拟数据', e);
-    // 模拟数据（示例）
     return [
-      { title: '示例：热门视频1', link: '#', channel: '示例频道', published: new Date().toISOString(), description: '这是模拟数据，真实API暂时不可用。请稍后重试。', thumbnail: '' },
-      { title: '示例：热门视频2', link: '#', channel: '示例频道', published: new Date().toISOString(), description: '您可以继续使用“生成介绍文”体验功能。', thumbnail: '' }
+      { title: '热门视频示例（网络抓取失败）', link: '#', channel: '示例频道', published: new Date().toISOString(), description: '请稍后重试，或切换其他地区。您仍可体验“生成介绍文”功能。', thumbnail: '' },
+      { title: '第二个示例视频', link: '#', channel: '示例频道', published: new Date().toISOString(), description: '我们正在努力恢复数据源', thumbnail: '' }
     ];
   }
 }
@@ -395,12 +401,14 @@ async function renderVideos(videos){
       </div>
     </div>`;
   });
-  document.getElementById('videoResults').innerHTML = html;
+  const resultsDiv = document.getElementById('videoResults');
+  if(resultsDiv) resultsDiv.innerHTML = html;
   videoCache = videos;
 }
 async function loadVideos(){
   const region = document.getElementById('videoRegion').value;
   const container = document.getElementById('videoResults');
+  if(!container) return;
   container.innerHTML = '<div class="loading"><span class="spinner"></span> 获取中...</div>';
   try{
     const videos = await fetchVideos(region);
@@ -413,6 +421,7 @@ async function genVideoArticle(idx){
   const v = videoCache[idx];
   if(!v) return;
   const container = document.getElementById(`video-art-${idx}`);
+  if(!container) return;
   container.style.display = 'block';
   container.innerHTML = '<div class="loading"><span class="spinner"></span> 生成中...</div>';
   const prompt = `根据视频信息写一篇150-200字的介绍文，用于发布：\n标题：${v.title}\n频道：${v.channel}\n描述：${v.description||'无'}\n输出短文，语言活泼，避免AI腔。`;
@@ -425,24 +434,35 @@ async function genVideoArticle(idx){
 }
 function copyTextFromEl(btn){ const txt = btn.previousSibling.innerText; navigator.clipboard.writeText(txt); alert('已复制'); }
 
-// 绑定事件
-document.getElementById('goNewsBtn').addEventListener('click', startNews);
-document.getElementById('goVideoBtn').addEventListener('click', loadVideos);
-document.getElementById('genCustomShepingBtn').addEventListener('click', generateCustomSheping);
-document.getElementById('copyCustomShepingBtn').addEventListener('click', copyCustom);
-document.querySelectorAll('.tab-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('newsPanel').style.display = btn.dataset.tab==='news'?'block':'none';
-    document.getElementById('videoPanel').style.display = btn.dataset.tab==='video'?'block':'none';
+// 绑定事件（确保 DOM 加载完成后再绑定）
+document.addEventListener('DOMContentLoaded', () => {
+  const goNewsBtn = document.getElementById('goNewsBtn');
+  if(goNewsBtn) goNewsBtn.addEventListener('click', startNews);
+  const goVideoBtn = document.getElementById('goVideoBtn');
+  if(goVideoBtn) goVideoBtn.addEventListener('click', loadVideos);
+  const genCustomBtn = document.getElementById('genCustomShepingBtn');
+  if(genCustomBtn) genCustomBtn.addEventListener('click', generateCustomSheping);
+  const copyCustomBtn = document.getElementById('copyCustomShepingBtn');
+  if(copyCustomBtn) copyCustomBtn.addEventListener('click', copyCustom);
+  
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const newsPanel = document.getElementById('newsPanel');
+      const videoPanel = document.getElementById('videoPanel');
+      if(newsPanel && videoPanel){
+        newsPanel.style.display = btn.dataset.tab==='news'?'block':'none';
+        videoPanel.style.display = btn.dataset.tab==='video'?'block':'none';
+      }
+    });
   });
-});
-document.querySelectorAll('#styleTabs .tab').forEach(t=>{
-  t.addEventListener('click',function(){
-    document.querySelectorAll('#styleTabs .tab').forEach(x=>x.classList.remove('on'));
-    this.classList.add('on');
-    curStyle = this.dataset.s;
+  document.querySelectorAll('#styleTabs .tab').forEach(t=>{
+    t.addEventListener('click',function(){
+      document.querySelectorAll('#styleTabs .tab').forEach(x=>x.classList.remove('on'));
+      this.classList.add('on');
+      curStyle = this.dataset.s;
+    });
   });
 });
 </script>
