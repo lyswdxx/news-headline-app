@@ -1,4 +1,3 @@
-// 优先关键词搜索（Google News RSS），无关键词则按分类抓取
 const CATEGORY_FEEDS = {
   科技: ['https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml', 'https://feeds.feedburner.com/TechCrunch'],
   财经: ['https://rss.nytimes.com/services/xml/rss/nyt/Business.xml', 'https://feeds.bloomberg.com/markets/news.rss'],
@@ -53,7 +52,6 @@ async function fetchFeed(url) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const { topic, kw } = req.query;
-  // 优先关键词搜索
   if (kw && kw !== topic && kw.trim()) {
     const searchUrl = getSearchUrl(kw.trim());
     const items = await fetchFeed(searchUrl);
@@ -66,7 +64,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ news: [{ title: `未找到与“${kw}”相关新闻`, summary: '请尝试其他关键词', source: '系统' }] });
     }
   }
-  // 无关键词：分类抓取
   let feeds = CATEGORY_FEEDS[topic] || [];
   let all = [];
   for (const url of feeds) {
