@@ -52,6 +52,16 @@ select,input[type=text]{height:38px;border:1px solid #ddd;border-radius:8px;padd
 .length-selector select,.shep-length-selector select{height:26px;font-size:11px;padding:0 6px}
 .custom-sheping{background:#fff;border-radius:12px;padding:16px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,0.07)}
 .custom-sheping textarea{width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:14px;min-height:100px;resize:vertical}
+.headline-box{border-left:3px solid #1aab6d;padding:10px 14px;background:#f6fdf9;border-radius:0 8px 8px 0;margin-bottom:10px}
+.hl-label{font-size:11px;color:#aaa;margin-bottom:4px}
+.hl-title{font-size:15px;font-weight:600;color:#111;line-height:1.5}
+.hl-hook{font-size:13px;color:#444;margin-top:5px;line-height:1.6}
+.source{font-size:12px;color:#aaa;margin-bottom:8px}
+.summary{font-size:13px;color:#555;line-height:1.7;margin-bottom:10px}
+.compliance{font-size:12px;padding:6px 12px;border-radius:8px;background:#f5f5f5;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dot-g{background:#1aab6d}
+.dot-r{background:#e74c3c}
 </style>
 </head>
 <body>
@@ -186,21 +196,28 @@ async function fetchNews(topic, kw, limit = 10) {
   if (!res.ok) throw new Error('抓取失败');
   const data = await res.json();
   
-  // 兼容新版 events 格式
-  if (data.events) return { events: data.events };
-  
-  // 兼容旧版 news 格式（过渡用）
-  if (data.news) {
-    const events = data.news.map(n => ({
-      event: n.title,
-      heat: 0,
-      count: 1,
-      articles: [n]
-    }));
-    return { events };
+  // 新版：事件聚合模式
+  if (data.events && data.events.length > 0) {
+    // 将事件展平为新闻列表（兼容原有渲染）
+    const newsList = [];
+    data.events.forEach(event => {
+      event.articles.forEach(article => {
+        newsList.push({
+          title: article.title,
+          summary: article.summary || article.title,
+          source: article.source || event.source || '热点聚合',
+          eventTitle: event.event,
+          heat: event.heat
+        });
+      });
+    });
+    return { mode: 'event', events: data.events, news: newsList };
   }
   
-  return { events: [] };
+  // 旧版：直接返回新闻列表
+  if (data.news) return { mode: 'news', news: data.news };
+  
+  return { mode: 'news', news: [] };
 }
 
 function cleanNewsData(news){
@@ -258,7 +275,39 @@ ${news.map((n,i)=>`${i+1}. 原标题：${n.title}\n摘要：${n.summary}`).join(
     return news.map(n=>({compliance:'pass',reason:'自动通过',title:fallbackTitle(n),hook:fallbackHook(n)}));
   }
 }
-
+// 原有的新闻卡片渲染函数（保留完整功能）
+async function renderAll(news, kw){
+  const results = await batchGen(news);
+  let html='', pass=0;
+  results.forEach((item,i)=>{
+    if(item.compliance !== 'block') pass++;
+    const len = item.title.length;
+    html += `<div class="card" id="card-${i}">
+      <div><strong>${escapeHtml(news[i].title)}</strong> <span class="tag tag-ok">${item.compliance==='block'?'已过滤':'合规'}</span></div>
+      <div class="source">来源：${news[i].source}</div>
+      <div class="summary">${escapeHtml(news[i].summary)}</div>
+      ${item.compliance!=='block' ? `
+      <div class="headline-box">
+        <div class="hl-label">头条文案</div>
+        <div class="hl-title" id="ht-${i}">${escapeHtml(item.title)}</div>
+        <div class="hl-hook" id="hs-${i}">${escapeHtml(item.hook)}</div>
+      </div>
+      <div class="actions">
+        <button class="btn-sm" onclick="copyIt(${i})">复制文案</button>
+        <button class="btn-sm" onclick="regenOne(${i})">换一版</button>
+        <div class="length-selector"><label>全文：</label><select id="lenSelect-${i}"><option value="short">短文300-500</option><option value="medium" selected>中篇600-800</option><option value="long">长文1000-1500</option></select></div>
+        <button class="btn-sm" onclick="genFullArticle(${i})">📝 改写报道</button>
+        <div class="shep-length-selector"><label>社评：</label><select id="shepLenSelect-${i}"><option value="200">200字</option><option value="500" selected>500字</option><option value="800">800字</option></select></div>
+        <button class="btn-sm" onclick="genSheping(${i})">📢 生成社评</button>
+        <span class="char-tip" id="cc-${i}">标题${len}字${len>25?'超长':''}</span>
+      </div>
+      <div id="full-article-${i}" style="display:none;margin-top:12px"><div class="hot-article" id="full-content-${i}"></div><button class="btn-sm" onclick="copyFullArticle(${i})">复制全文</button></div>
+      <div id="sheping-${i}" style="display:none;margin-top:12px"><div class="hot-article" id="sheping-content-${i}"></div><button class="btn-sm" onclick="copySheping(${i})">复制社评</button></div>
+      ` : `<div class="err">此条已过滤：${item.reason}</div>`}
+    </div>`;
+  });
+  document.getElementById('newsResults').innerHTML = html;
+}
 async function renderAllEvents(events, kw) {
   let html = '';
   
@@ -357,40 +406,36 @@ async function startNews(){
   resultsDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 抓取热点事件中...</div>';
 
   try{
-    // 获取数据（新版API返回 { events: [...] }）
     const data = await fetchNews(topic, kw, 10);
     
-    // 提取事件数组
-    let events = data.events || [];
-    
-    // 兜底：如果没有事件，生成一个默认事件
-    if(!events || events.length === 0){
-      events = [{
-        event: `暂无“${kw || topic}”相关热点`,
-        heat: 0,
-        count: 0,
-        articles: [{ title: '请尝试其他关键词', summary: '系统正在持续更新中', source: '系统' }]
-      }];
+    // 模式1：事件聚合模式（有新数据时）
+    if (data.mode === 'event' && data.events && data.events.length > 0) {
+      window.eventCache = data.events;
+      await renderAllEvents(data.events, kw || topic);
+      return;
     }
-
-    // 缓存事件（供后续生成文章使用）
-    window.eventCache = events;
-
-    // 渲染事件（新版 renderAllEvents 函数）
-    await renderAllEvents(events, kw || topic);
+    
+    // 模式2：传统新闻模式（兜底）
+    let news = data.news || [];
+    news = cleanNewsData(news);
+    
+    if(!news || news.length === 0){
+      news = getFallbackNews(topic, kw);
+    }
+    if(!news || news.length === 0){
+      news = [{ title: '暂无可用新闻', summary: '当前接口异常，请稍后再试', source: '系统' }];
+    }
+    
+    newsCache = news;
+    fullArticles = {};
+    shepingCache = {};
+    await renderAll(news, kw || topic);
 
   }catch(e){
     console.error(e);
-
-    // 降级兜底
-    const fallbackEvents = [{
-      event: `热点加载中，请稍后重试`,
-      heat: 0,
-      count: 1,
-      articles: [{ title: '网络异常或暂无数据', summary: '请刷新页面或稍后再试', source: '系统' }]
-    }];
-    window.eventCache = fallbackEvents;
-    await renderAllEvents(fallbackEvents, kw || topic);
+    const news = getFallbackNews(topic, kw);
+    newsCache = news;
+    await renderAll(news, kw || topic);
   }
 }
 
@@ -471,7 +516,7 @@ async function genFullArticle(i){
 	  let clean = article.replace(/```/g,'').trim();
 
 	  // 🔥 去AI味
-	  clean = removeAiTone(clean);
+	  clean = removeAiTone(clean); 
 
 	  if(clean.length < 200) throw new Error('内容过短');
 
@@ -534,14 +579,12 @@ function removeAiTone(text){
     .replace(/值得注意的是/g,'')
     .replace(/进一步来看/g,'')
     .replace(/从某种程度上/g,'')
-
+    .replace(/首先|其次|再者|综上所述/g,'')
     // 去掉总结句套路
     .replace(/总的来看[,，]?/g,'')
     .replace(/可以看出[,，]?/g,'')
-
     // 去掉“官方口吻”
     .replace(/相关方面表示/g,'')
-
     // 清理多余空行
     .replace(/\n{3,}/g,'\n\n')
     .trim();
