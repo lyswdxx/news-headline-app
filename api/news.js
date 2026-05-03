@@ -1,27 +1,24 @@
 // ==========================================
-// 天行 API 聚合接口（热点、国内、旅游、AI、互联网、IT、花边、区域、科技探针）
+// 天行 API 聚合接口（支持所有分类）
 // ==========================================
 
 const API_BASE = 'https://apis.tianapi.com';
 const apiKey = process.env.TIAN_API_KEY;
 
-// 分类 → 接口路径 映射表
+// 分类 → 接口路径 映射表（与前端的 topicSel 选项一一对应）
 const CATEGORY_API = {
-  科技: '/it/index',         // IT 资讯
-  财经: '/internet/index',    // 互联网（含财经热点）
-  人工智能: '/ai/index',      // 人工智能
-  体育: '/internet/index',    // 互联网（体育话题也包含）
+  科技: '/it/index',           // IT 资讯
+  财经: '/internet/index',     // 互联网（含财经）
+  人工智能: '/ai/index',       // 人工智能
+  体育: '/internet/index',     // 互联网（体育话题）
   健康: '/internet/index',
-  社会民生: '/guonei/index',  // 国内新闻
+  社会民生: '/guonei/index',   // 国内新闻
   汽车: '/internet/index',
   教育: '/internet/index',
-  娱乐: '/huabian/index',     // 花边新闻
-  旅游: '/travel/index',      // 旅游资讯
-  区域: '/areanews/index',    // 区域新闻
-  科技探针: '/sicprobe/index',// 科技探针
+  娱乐: '/huabian/index',      // 花边新闻
+  旅游: '/travel/index',       // 旅游资讯（前端需增加此选项）
 };
 
-// 默认接口（国内新闻）
 const DEFAULT_API = '/guonei/index';
 
 // 调用天行 API
@@ -45,7 +42,6 @@ async function fetchTianApi(apiPath, num = 12) {
       console.error(`天行 API 错误 [${apiPath}]:`, data.msg);
       return [];
     }
-    // 转换为前端需要的格式
     return data.newslist.map(item => ({
       title: item.title,
       summary: item.description || item.content || '暂无摘要',
@@ -59,7 +55,7 @@ async function fetchTianApi(apiPath, num = 12) {
   }
 }
 
-// Google 新闻搜索（用户输入关键词时使用）
+// Google 新闻搜索（用户输入关键词时）
 function getSearchUrl(keyword) {
   return `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
 }
@@ -107,7 +103,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const { topic, kw } = req.query;
 
-  // 1. 用户输入关键词 → 优先搜索 Google 新闻
+  // 1. 关键词优先
   if (kw && kw.trim() && kw !== topic) {
     const searchNews = await fetchSearchFeed(kw.trim());
     if (searchNews.length >= 3) {
@@ -115,14 +111,14 @@ export default async function handler(req, res) {
     }
   }
 
-  // 2. 根据分类调用对应的天行 API
+  // 2. 根据分类调用天行 API
   const apiPath = CATEGORY_API[topic] || DEFAULT_API;
   const hotNews = await fetchTianApi(apiPath);
   if (hotNews.length >= 3) {
     return res.status(200).json({ news: hotNews.slice(0, 6) });
   }
 
-  // 3. 终极兜底（保证永远有数据返回）
+  // 3. 兜底
   const fallback = fallbackNews(topic || kw || '热门');
   res.status(200).json({ news: fallback });
 }
