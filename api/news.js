@@ -1,64 +1,65 @@
 // ==========================================
-// 热点新闻接口 - 天行热榜 API（真实热点）
+// 热点新闻接口 - VVHAN 免费热榜（无需 Key）
 // ==========================================
 
-const TIAN_API_BASE = 'https://api.tianapi.com/hotnews';
+const VVHAN_HOT_API = 'https://api.vvhan.com/api/hotlist';
 
-// 分类映射（让用户选择的分类对应 API 的必要参数）
+// 分类映射（VVHAN 支持的热榜类型）
 const CATEGORY_MAP = {
-  科技: 'tech',
-  财经: 'finance',
-  人工智能: 'ai',
-  体育: 'sports',
-  健康: 'health',
-  社会民生: 'hot',
-  汽车: 'car',
-  教育: 'edu',
-  娱乐: 'entertainment'
+  科技: '36kr',         // 36氪热榜
+  财经: 'zhihu',        // 知乎热榜（含财经话题）
+  人工智能: 'zhihu',    // 知乎热榜
+  体育: 'zhihu',
+  健康: 'zhihu',
+  社会民生: 'weibo',    // 微博热搜
+  汽车: 'zhihu',
+  教育: 'zhihu',
+  娱乐: 'weibo',        // 微博热搜
 };
 
-// 直接调用天行热榜 API（返回实时热点）
-async function getRealHotNews(category = 'hot') {
-  const apiKey = process.env.TIAN_API_KEY;
-  if (!apiKey) {
-    console.error('未配置 TIAN_API_KEY');
-    return [];
-  }
-
+async function fetchHotNews(category = 'weibo') {
   try {
-    const url = `${TIAN_API_BASE}/?key=${apiKey}&word=${category}&num=20`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(url, {
-      method: 'GET',
+    const res = await fetch(VVHAN_HOT_API, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
-      signal: controller.signal
+      signal: controller.signal,
     });
     clearTimeout(timeout);
-
     if (!res.ok) return [];
-    const data = await res.json();
 
-    if (data.code !== 200) {
-      console.error('天行 API 错误:', data.msg);
-      return [];
+    const data = await res.json();
+    if (!data.success || !data.data) return [];
+
+    // 根据分类选择热榜源
+    const sourceKey = CATEGORY_MAP[category] || 'weibo';
+    let hotList = [];
+
+    if (sourceKey === 'weibo' && data.data.weibo) {
+      hotList = data.data.weibo;
+    } else if (sourceKey === 'zhihu' && data.data.zhihu) {
+      hotList = data.data.zhihu;
+    } else if (sourceKey === '36kr' && data.data['36kr']) {
+      hotList = data.data['36kr'];
+    } else {
+      // 默认取微博热搜
+      hotList = data.data.weibo || [];
     }
 
-    // 转换为前端需要的格式
-    return data.newslist.map(item => ({
+    return hotList.slice(0, 12).map(item => ({
       title: item.title,
-      summary: item.description || item.content || '热点事件，网友讨论激烈',
-      source: item.source || item.author || '天行热榜',
-      hot: item.hot || '',
-      link: item.url || '',
+      summary: `热度值 ${item.hot || '正在热议'}，网友讨论激烈。`,
+      source: sourceKey === 'weibo' ? '微博热搜' : (sourceKey === 'zhihu' ? '知乎热榜' : '36氪热榜'),
+      hot: item.hot,
+      link: item.url || '#',
     }));
   } catch (err) {
-    console.error('抓取天行热榜失败:', err);
+    console.error('VVHAN 热榜抓取失败:', err);
     return [];
   }
 }
 
-// Google 新闻搜索备用（当用户输入关键词时优先使用）
+// Google 搜索备用（当用户输入关键词时）
 function getSearchUrl(keyword) {
   return `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
 }
@@ -75,7 +76,7 @@ async function fetchSearchFeed(keyword) {
     if (!res.ok) return [];
     const xml = await res.text();
     const blocks = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
-    return blocks.slice(0, 8).map(block => {
+    return blocks.slice(0, 6).map(block => {
       let title = block.match(/<title>([\s\S]*?)<\/title>/)?.[1] || '';
       let summary = block.match(/<description>([\s\S]*?)<\/description>/)?.[1] || '';
       title = cleanText(title);
@@ -92,22 +93,21 @@ async function fetchSearchFeed(keyword) {
   }
 }
 
-// 最终兜底（保证接口永不空）
-function fallbackHotNews(keyword) {
+// 终极兜底（保证永不空）
+function fallbackNews(keyword) {
   const kw = keyword || '热点';
   return [
-    { title: `${kw}全网热度飙升，网友纷纷热议`, summary: `关于“${kw}”的话题阅读量破亿，登顶热搜。`, source: '系统热点' },
-    { title: `${kw}最新动态，相关部门已关注`, summary: `多方回应后，“${kw}”事件仍在发酵。`, source: '系统热点' },
-    { title: `${kw}背后的真相，你知道吗？`, summary: `深度分析“${kw}”的来龙去脉。`, source: '系统热点' },
+    { title: `${kw}今日热度飙升，全网都在讨论`, summary: `关于“${kw}”的话题登上热搜，网友观点不一。`, source: '实时热点' },
+    { title: `${kw}最新进展，多方回应来了`, summary: `相关部门已关注“${kw}”，将及时公布结果。`, source: '实时热点' },
+    { title: `${kw}背后的真相，你知道多少？`, summary: `深度解析“${kw}”的来龙去脉，引发深思。`, source: '实时热点' },
   ];
 }
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const { topic, kw } = req.query;
-  let news = [];
 
-  // 1. 关键词优先（用户主动搜索）
+  // 1. 用户输入关键词 → 优先搜索 Google 新闻
   if (kw && kw.trim() && kw !== topic) {
     const searchNews = await fetchSearchFeed(kw.trim());
     if (searchNews.length >= 3) {
@@ -115,15 +115,13 @@ export default async function handler(req, res) {
     }
   }
 
-  // 2. 获取真实热榜（根据分类）
-  const categoryKey = CATEGORY_MAP[topic] || 'hot';
-  const hotNews = await getRealHotNews(categoryKey);
-  
+  // 2. 获取热榜（根据分类，默认微博热搜）
+  const hotNews = await fetchHotNews(topic);
   if (hotNews.length >= 3) {
     return res.status(200).json({ news: hotNews.slice(0, 6) });
   }
 
-  // 3. 终极兜底（保证永远有数据返回）
-  const fallback = fallbackHotNews(topic || kw || '今日热门');
+  // 3. 终极兜底
+  const fallback = fallbackNews(topic || kw || '热门');
   res.status(200).json({ news: fallback });
 }
