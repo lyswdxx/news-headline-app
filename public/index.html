@@ -308,6 +308,35 @@ async function renderAll(news, kw){
   });
   document.getElementById('newsResults').innerHTML = html;
 }
+async function renderAll(news, kw){
+  const results = await batchGen(news);
+  let html='', pass=0;
+  results.forEach((item,i)=>{
+    if(item.compliance !== 'block') pass++;
+    const len = item.title.length;
+    html += `<div class="card" id="card-${i}">
+      <div><strong>${escapeHtml(news[i].title)}</strong> <span class="tag tag-ok">${item.compliance==='block'?'已过滤':'合规'}</span></div>
+      <div class="source">来源：${news[i].source}</div>
+      <div class="summary">${escapeHtml(news[i].summary)}</div>
+      ${item.compliance!=='block' ? `
+      <div class="headline-box"><div class="hl-label">头条文案</div><div class="hl-title" id="ht-${i}">${escapeHtml(item.title)}</div><div class="hl-hook" id="hs-${i}">${escapeHtml(item.hook)}</div></div>
+      <div class="actions">
+        <button class="btn-sm" onclick="copyIt(${i})">复制文案</button>
+        <button class="btn-sm" onclick="regenOne(${i})">换一版</button>
+        <div class="length-selector"><label>全文：</label><select id="lenSelect-${i}"><option value="short">短文300-500</option><option value="medium" selected>中篇600-800</option><option value="long">长文1000-1500</option></select></div>
+        <button class="btn-sm" onclick="genFullArticle(${i})">📝 改写报道</button>
+        <div class="shep-length-selector"><label>社评：</label><select id="shepLenSelect-${i}"><option value="200">200字</option><option value="500" selected>500字</option><option value="800">800字</option></select></div>
+        <button class="btn-sm" onclick="genSheping(${i})">📢 生成社评</button>
+        <span class="char-tip" id="cc-${i}">标题${len}字${len>25?'超长':''}</span>
+      </div>
+      <div id="full-article-${i}" style="display:none;margin-top:12px"><div class="hot-article" id="full-content-${i}"></div><button class="btn-sm" onclick="copyFullArticle(${i})">复制全文</button></div>
+      <div id="sheping-${i}" style="display:none;margin-top:12px"><div class="hot-article" id="sheping-content-${i}"></div><button class="btn-sm" onclick="copySheping(${i})">复制社评</button></div>
+      ` : `<div class="err">此条已过滤：${item.reason}</div>`}
+    </div>`;
+  });
+  const resultsDiv = document.getElementById('newsResults');
+  if(resultsDiv) resultsDiv.innerHTML = html;
+}
 // 统一渲染函数（支持事件模式和新闻模式，带字数选择和时间显示）
 async function renderAllEvents(events, kw) {
   let html = '';
