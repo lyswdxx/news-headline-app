@@ -1,16 +1,16 @@
 // 免费 RSS 抓取新闻，作为 /api/news 接口
 const FEEDS = {
-  科技:   'https://feeds.feedburner.com/36kr/news/all',
-  财经:   'https://wallstreetcn.com/feed',
-  人工智能:'https://www.jiqizhixin.com/rss',
-  体育:   'https://rss.sina.com.cn/news/china/focus15.xml',
-  健康:   'https://rss.sina.com.cn/news/health/focus15.xml',
-  社会民生:'https://rss.sina.com.cn/news/society/focus15.xml',
-  汽车:   'https://rss.sina.com.cn/news/auto/focus15.xml',
-  教育:   'https://rss.sina.com.cn/news/edu/focus15.xml',
+  科技: 'https://rss.sina.com.cn/news/tech/focus15.xml',
+  财经: 'https://rss.sina.com.cn/news/finance/focus15.xml',
+  人工智能: 'https://rss.sina.com.cn/news/tech/focus15.xml',
+  体育: 'https://rss.sina.com.cn/news/sports/focus15.xml',
+  健康: 'https://rss.sina.com.cn/news/health/focus15.xml',
+  社会民生: 'https://rss.sina.com.cn/news/society/focus15.xml',
+  汽车: 'https://rss.sina.com.cn/news/auto/focus15.xml',
+  教育: 'https://rss.sina.com.cn/news/edu/focus15.xml',
 };
 
-// 通用备用源（关键词搜索用）
+// 通用备用源
 const FALLBACK = 'https://rss.sina.com.cn/news/china/focus15.xml';
 
 function stripHtml(str) {
@@ -27,8 +27,13 @@ function parseRSS(xml) {
     };
     const title = get('title');
     const summary = get('description') || get('summary');
-    const source = (xml.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || '综合';
-    if (title) items.push({ title, summary: summary.slice(0, 150), source: stripHtml(source).slice(0, 20) });
+    const sourceMatch = xml.match(/<title>([\s\S]*?)<\/title>/);
+    const source = sourceMatch ? sourceMatch[1] : '综合';
+    if (title) items.push({ 
+      title: title.slice(0, 80), 
+      summary: summary.slice(0, 200), 
+      source: stripHtml(source).slice(0, 20) 
+    });
   }
   return items;
 }
@@ -41,12 +46,14 @@ export default async function handler(req, res) {
   const feedUrl = FEEDS[topic] || FALLBACK;
 
   try {
-    const r = await fetch(feedUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const r = await fetch(feedUrl, { 
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } 
+    });
     const xml = await r.text();
     let items = parseRSS(xml);
 
     // 关键词过滤
-    if (kw && kw !== topic) {
+    if (kw && kw !== topic && kw !== 'undefined' && kw !== 'null') {
       const kwLower = kw.toLowerCase();
       const filtered = items.filter(i =>
         i.title.toLowerCase().includes(kwLower) ||
@@ -55,8 +62,9 @@ export default async function handler(req, res) {
       if (filtered.length >= 2) items = filtered;
     }
 
-    res.status(200).json({ news: items.slice(0, 5) });
+    res.status(200).json({ news: items.slice(0, 6) });
   } catch (err) {
+    console.error('News fetch error:', err);
     res.status(500).json({ error: err.message });
   }
 }
