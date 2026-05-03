@@ -1,9 +1,8 @@
-// 稳定 RSS 源（优先使用海外可访问的源，避免 RSSHub）
+// 稳定 RSS 源（海外可访问，主题匹配）
 const FEEDS = {
   科技: [
     'https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml',
     'https://feeds.feedburner.com/TechCrunch',
-    'https://www.wired.com/feed/rss',
   ],
   财经: [
     'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml',
@@ -34,41 +33,51 @@ const FEEDS = {
     'https://www.chronicle.com/rss/news',
   ],
   娱乐: [
-    // 海外可直接访问的娱乐源（英文为主，但主题匹配）
     'https://rss.cnn.com/services/rss/entertainment/',
     'https://feeds.feedburner.com/ew/inside-tv',
     'https://www.tmz.com/rss.xml',
     'https://www.eonline.com/rss/news',
-    // 中文娱乐源：使用 Google News RSS 搜索“香港娱乐”（确保不依赖 RSSHub）
+    // 中文娱乐：使用 Google News RSS 搜索关键词（返回的内容会自动清理 HTML）
     'https://news.google.com/rss/search?q=%E9%A6%99%E6%B8%AF%E5%A8%B1%E4%B9%90&hl=zh-CN&gl=CN&ceid=CN:zh-Hans',
     'https://news.google.com/rss/search?q=%E9%A6%99%E6%B8%AF%E6%98%8E%E6%98%9F&hl=zh-CN&gl=CN&ceid=CN:zh-Hans',
   ],
 };
 
-// 不再使用国际综合新闻作为全部分类的备用，改为各自分类专用的备用
+// 分类专用备用（避免降级到不相关源）
 const CATEGORY_FALLBACK = {
   娱乐: [
     'https://rss.cnn.com/services/rss/entertainment/',
     'https://news.google.com/rss/search?q=%E5%A8%B1%E4%B9%90&hl=zh-CN&gl=CN&ceid=CN:zh-Hans',
   ],
-  科技: ['https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml'],
-  财经: ['https://rss.nytimes.com/services/xml/rss/nyt/Business.xml'],
-  // 其他分类类似...
 };
-// 通用兜底（仅当分类没有特定备用时使用）
+
+// 全局备用（仅当分类源和专用备用都失败时使用，娱乐分类不会走到这里）
 const GLOBAL_FALLBACK = [
   'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml',
   'https://feeds.bbci.co.uk/news/world/rss.xml',
 ];
 
+// 强化清理函数：移除 HTML 标签、解码 HTML 实体、删除多余空白
 function cleanText(str) {
   if (!str) return '';
-  let text = str.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  // 1. 替换常见的 HTML 实体
+  let text = str.replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&amp;/g, '&')
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
+                .replace(/&nbsp;/g, ' ');
+  // 2. 移除所有 HTML 标签（包括 <a>、<br>、<img> 等）
+  text = text.replace(/<[^>]*>/g, ' ');
+  // 3. 移除 CDATA 标记
+  text = text.replace(/<!\[CDATA\[|\]\]>/g, '');
+  // 4. 压缩空白字符并去除首尾空格
+  text = text.replace(/\s+/g, ' ').trim();
+  // 5. 过滤常见的推广语
   text = text.replace(/欢迎关注.*?微信公众号.*?（微信号：.*?）。*$/g, '')
              .replace(/更多精彩内容.*$/g, '')
              .replace(/第一时间为您奉上.*$/g, '')
-             .replace(/点击.*?了解更多.*$/g, '')
-             .trim();
+             .replace(/点击.*?了解更多.*$/g, '');
   return text;
 }
 
@@ -89,6 +98,7 @@ async function fetchFeed(url) {
       let title = (block.match(/<title>([\s\S]*?)<\/title>/)?.[1] || '');
       let summary = (block.match(/<description>([\s\S]*?)<\/description>/)?.[1] ||
                      block.match(/<summary>([\s\S]*?)<\/summary>/)?.[1] || '');
+      // 应用强力清理
       title = cleanText(title);
       summary = cleanText(summary);
       if (title) {
@@ -110,11 +120,10 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const { topic, kw } = req.query;
   
-  // 获取该分类的 feeds
   let feeds = FEEDS[topic] || [];
   let allItems = [];
   
-  // 尝试抓取分类指定的源
+  // 抓取分类主源
   for (const url of feeds) {
     const items = await fetchFeed(url);
     if (items.length) {
@@ -123,7 +132,7 @@ export default async function handler(req, res) {
     }
   }
   
-  // 如果分类源全部失败，尝试该分类的专用备用源
+  // 如果主源失败，尝试分类专用备用
   if (allItems.length === 0 && CATEGORY_FALLBACK[topic]) {
     for (const url of CATEGORY_FALLBACK[topic]) {
       const items = await fetchFeed(url);
@@ -134,7 +143,7 @@ export default async function handler(req, res) {
     }
   }
   
-  // 如果仍然为空且不是娱乐分类（避免娱乐拿到不相关全局源），才使用全局备用
+  // 非娱乐分类才允许使用全局备用（避免娱乐拿到不相关新闻）
   if (allItems.length === 0 && topic !== '娱乐') {
     for (const url of GLOBAL_FALLBACK) {
       const items = await fetchFeed(url);
@@ -145,7 +154,6 @@ export default async function handler(req, res) {
     }
   }
   
-  // 如果最终 still 没有条目，返回友好提示
   if (allItems.length === 0) {
     return res.status(200).json({
       news: [{
@@ -165,7 +173,6 @@ export default async function handler(req, res) {
     if (filtered.length > 0) {
       allItems = filtered;
     } else {
-      // 如果没有匹配关键词的新闻，返回提示而不是返回不相关的内容
       return res.status(200).json({
         news: [{
           title: `未找到与“${kw}”相关的娱乐新闻`,
