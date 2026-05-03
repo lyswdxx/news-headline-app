@@ -104,12 +104,33 @@ export default async function handler(req, res) {
   const { topic, kw } = req.query;
 
   // 1. 关键词优先
-  if (kw && kw.trim() && kw !== topic) {
-    const searchNews = await fetchSearchFeed(kw.trim());
-    if (searchNews.length >= 3) {
-      return res.status(200).json({ news: searchNews.slice(0, 6) });
-    }
-  }
+  let finalNews = [];
+
+// 1. 关键词 → Google
+	if (kw && kw.trim() && kw !== topic) {
+	  const searchNews = await fetchSearchFeed(kw.trim());
+	  finalNews = finalNews.concat(searchNews);
+	}
+
+	// 2. 天行补充
+	const apiPath = CATEGORY_API[topic] || DEFAULT_API;
+	const hotNews = await fetchTianApi(apiPath);
+	finalNews = finalNews.concat(hotNews);
+
+	// 去重（按标题）
+	const unique = [];
+	const map = new Set();
+	for (let n of finalNews) {
+	  if (!map.has(n.title)) {
+		map.add(n.title);
+		unique.push(n);
+	  }
+	}
+
+	// 返回最多6条
+	if (unique.length > 0) {
+	  return res.status(200).json({ news: unique.slice(0, 6) });
+	}
 
   // 2. 根据分类调用天行 API
   const apiPath = CATEGORY_API[topic] || DEFAULT_API;
