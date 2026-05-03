@@ -355,7 +355,7 @@ async function renderAllEvents(events, kw) {
         </div>
         
         <div style="margin-top:8px; font-size:13px; color:#555; background:#f9f9f9; padding:8px; border-radius:8px; max-height:150px; overflow-y:auto;">
-          ${articles.map(a => `• ${escapeHtml(a.title)} <span style="color:#aaa; font-size:11px;">(${formatDateTime(a.pubDate)})</span>`).join('<br>')}
+          ${e.articles.map(a => `• <a href="${escapeHtml(a.link || '#')}" target="_blank" rel="noopener noreferrer" style="color:#1aab6d; text-decoration:none;">${escapeHtml(a.title)}</a> <span style="color:#aaa; font-size:11px;">(${formatDateTime(a.pubDate)})</span>`).join('<br>')}
         </div>
         
         <!-- 头条文案区域 -->
