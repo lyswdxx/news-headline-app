@@ -403,20 +403,35 @@ async function startNews(){
   const resultsDiv = document.getElementById('newsResults');
   if(!resultsDiv) return;
 
-  resultsDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 抓取热点事件中...</div>';
+  resultsDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 抓取新闻中...</div>';
 
   try{
-    const data = await fetchNews(topic, kw, 10);
+    // 直接获取新闻列表（不做事件聚合）
+    const params = new URLSearchParams({ 
+      topic, 
+      kw: kw || topic,
+      limit: '10'
+    });
+    const res = await fetch('/api/news?' + params);
+    const data = await res.json();
     
-    // 模式1：事件聚合模式（有新数据时）
-    if (data.mode === 'event' && data.events && data.events.length > 0) {
-      window.eventCache = data.events;
-      await renderAllEvents(data.events, kw || topic);
-      return;
+    let news = [];
+    
+    // 处理事件格式 -> 转换为新闻列表
+    if (data.events && data.events.length > 0) {
+      data.events.forEach(event => {
+        event.articles.forEach(article => {
+          news.push({
+            title: article.title,
+            summary: article.summary || article.title,
+            source: article.source || event.source || '热点聚合'
+          });
+        });
+      });
+    } else if (data.news) {
+      news = data.news;
     }
     
-    // 模式2：传统新闻模式（兜底）
-    let news = data.news || [];
     news = cleanNewsData(news);
     
     if(!news || news.length === 0){
@@ -429,6 +444,8 @@ async function startNews(){
     newsCache = news;
     fullArticles = {};
     shepingCache = {};
+    
+    // ⭐ 关键：调用 renderAll（带字数选择的版本）
     await renderAll(news, kw || topic);
 
   }catch(e){
