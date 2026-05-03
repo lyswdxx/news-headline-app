@@ -304,7 +304,12 @@ async function renderAll(news, kw){
     
     html += `<div class="card" id="card-${i}">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-        <div><strong>${escapeHtml(news[i].title)}</strong> <span class="tag tag-ok">${item.compliance==='block'?'已过滤':'合规'}</span></div>
+        <div>
+		  <a href="${escapeHtml(news[i].link || '#')}" target="_blank" rel="noopener noreferrer" style="color:#1aab6d; text-decoration:none; font-weight:bold;">
+			${escapeHtml(news[i].title)}
+		  </a>
+		  <span class="tag tag-ok">${item.compliance==='block'?'已过滤':'合规'}</span>
+		</div>
         <div style="display:flex; gap:12px; align-items:center;">
           <span style="font-size:12px; background:#f0f0f0; padding:2px 8px; border-radius:20px;">热度 ${news[i].hot || 0}</span>
           <span style="font-size:12px; color:#888;">📅 ${formatDateTime(pubDate)}</span>
