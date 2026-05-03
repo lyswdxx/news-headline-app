@@ -184,12 +184,23 @@ async function fetchNews(topic, kw, limit = 10) {
   });
   const res = await fetch('/api/news?' + params);
   if (!res.ok) throw new Error('抓取失败');
-  const d = await res.json();
-  // 前端二次清理摘要（防止残留标签）
-  return d.news.map(n => ({
-    ...n,
-    summary: n.summary.replace(/<[^>]*>/g, '').replace(/&[a-z]+;/g, '')
-  }));
+  const data = await res.json();
+  
+  // 兼容新版 events 格式
+  if (data.events) return { events: data.events };
+  
+  // 兼容旧版 news 格式（过渡用）
+  if (data.news) {
+    const events = data.news.map(n => ({
+      event: n.title,
+      heat: 0,
+      count: 1,
+      articles: [n]
+    }));
+    return { events };
+  }
+  
+  return { events: [] };
 }
 
 function cleanNewsData(news){
@@ -248,34 +259,93 @@ ${news.map((n,i)=>`${i+1}. 原标题：${n.title}\n摘要：${n.summary}`).join(
   }
 }
 
-async function renderAll(news, kw){
-  const results = await batchGen(news);
-  let html='', pass=0;
-  results.forEach((item,i)=>{
-    if(item.compliance !== 'block') pass++;
-    const len = item.title.length;
-    html += `<div class="card" id="card-${i}">
-      <div><strong>${escapeHtml(news[i].title)}</strong> <span class="tag tag-ok">${item.compliance==='block'?'已过滤':'合规'}</span></div>
-      <div class="source">来源：${news[i].source}</div>
-      <div class="summary">${escapeHtml(news[i].summary)}</div>
-      ${item.compliance!=='block' ? `
-      <div class="headline-box"><div class="hl-label">头条文案</div><div class="hl-title" id="ht-${i}">${escapeHtml(item.title)}</div><div class="hl-hook" id="hs-${i}">${escapeHtml(item.hook)}</div></div>
-      <div class="actions">
-        <button class="btn-sm" onclick="copyIt(${i})">复制文案</button>
-        <button class="btn-sm" onclick="regenOne(${i})">换一版</button>
-        <div class="length-selector"><label>全文：</label><select id="lenSelect-${i}"><option value="short">短文300-500</option><option value="medium" selected>中篇600-800</option><option value="long">长文1000-1500</option></select></div>
-        <button class="btn-sm" onclick="genFullArticle(${i})">📝 改写报道</button>
-        <div class="shep-length-selector"><label>社评：</label><select id="shepLenSelect-${i}"><option value="200">200字</option><option value="500" selected>500字</option><option value="800">800字</option></select></div>
-        <button class="btn-sm" onclick="genSheping(${i})">📢 生成社评</button>
-        <span class="char-tip" id="cc-${i}">标题${len}字${len>25?'超长':''}</span>
+async function renderAllEvents(events, kw) {
+  let html = '';
+  
+  events.forEach((e, i) => {
+    const heatLevel = e.heat > 100 ? '🔥🔥🔥' : (e.heat > 50 ? '🔥🔥' : '🔥');
+    html += `
+      <div class="card" id="event-card-${i}">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <strong style="font-size:16px;">${heatLevel} ${escapeHtml(e.event)}</strong>
+          <span style="font-size:12px; background:#f0f0f0; padding:2px 8px; border-radius:20px;">热度 ${e.heat}</span>
+        </div>
+        
+        <div style="margin:8px 0; font-size:12px; color:#888;">
+          📰 相关新闻 ${e.count} 条
+        </div>
+        
+        <div style="margin-top:8px; font-size:13px; color:#555; background:#f9f9f9; padding:8px; border-radius:8px; max-height:150px; overflow-y:auto;">
+          ${e.articles.map(a => `• ${escapeHtml(a.title)}`).join('<br>')}
+        </div>
+        
+        <div class="actions" style="margin-top:12px;">
+          <button class="btn-sm" onclick="genFromEvent(${i})">📝 生成文章</button>
+          <button class="btn-sm" onclick="genShepingFromEvent(${i})">📢 生成社评</button>
+        </div>
+        
+        <div id="event-article-${i}" class="hot-article" style="display:none; margin-top:12px;"></div>
+        <div id="event-sheping-${i}" class="hot-article" style="display:none; margin-top:12px;"></div>
       </div>
-      <div id="full-article-${i}" style="display:none;margin-top:12px"><div class="hot-article" id="full-content-${i}"></div><button class="btn-sm" onclick="copyFullArticle(${i})">复制全文</button></div>
-      <div id="sheping-${i}" style="display:none;margin-top:12px"><div class="hot-article" id="sheping-content-${i}"></div><button class="btn-sm" onclick="copySheping(${i})">复制社评</button></div>
-      ` : `<div class="err">此条已过滤：${item.reason}</div>`}
-    </div>`;
+    `;
   });
-  const resultsDiv = document.getElementById('newsResults');
-  if(resultsDiv) resultsDiv.innerHTML = html;
+  
+  document.getElementById('newsResults').innerHTML = html || '<div class="empty">暂无热点事件</div>';
+}
+
+// 基于事件生成文章（去AI味）
+async function genFromEvent(index) {
+  const event = window.eventCache[index];
+  if (!event) return;
+  const container = document.getElementById(`event-article-${index}`);
+  container.style.display = 'block';
+  container.innerHTML = '<div class="loading"><span class="spinner"></span> 基于多源事件撰写中...</div>';
+  
+  const titles = event.articles.map(a => a.title).join('\n');
+  const prompt = `根据以下多条新闻，写一篇通俗易懂、像人写的文章（600字左右），不要新闻腔，不要“首先其次”，不要AI痕迹，可以带一点个人观点但不夸张。\n\n${titles}`;
+  
+  try {
+    const article = await callDS([{ role: 'user', content: prompt }], 1200);
+    const cleaned = removeAiTone(article);
+    container.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(cleaned)}</div><button class="btn-sm" onclick="copyText(this, '${escapeHtml(cleaned).replace(/'/g, "\\'")}')">复制全文</button>`;
+  } catch (err) {
+    container.innerHTML = `<div class="err">生成失败：${err.message}</div>`;
+  }
+}
+
+// 基于事件生成社评
+async function genShepingFromEvent(index) {
+  const event = window.eventCache[index];
+  if (!event) return;
+  const container = document.getElementById(`event-sheping-${index}`);
+  container.style.display = 'block';
+  container.innerHTML = '<div class="loading"><span class="spinner"></span> 撰写社评中...</div>';
+  
+  const titles = event.articles.map(a => a.title).join('\n');
+  const prompt = `根据以下热点事件，写一篇300字左右的短评，观点积极，符合主流价值观，不要AI腔。\n\n${titles}`;
+  
+  try {
+    const article = await callDS([{ role: 'user', content: prompt }], 800);
+    container.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(article)}</div><button class="btn-sm" onclick="copyText(this, '${escapeHtml(article).replace(/'/g, "\\'")}')">复制社评</button>`;
+  } catch (err) {
+    container.innerHTML = `<div class="err">生成失败：${err.message}</div>`;
+  }
+}
+
+// 辅助函数：复制文本
+function copyText(btn, text) {
+  navigator.clipboard.writeText(text);
+  const original = btn.innerText;
+  btn.innerText = '已复制 ✓';
+  setTimeout(() => btn.innerText = original, 1500);
+}
+
+// 去AI味函数（您已有的，如果没有则添加）
+function removeAiTone(text) {
+  return text.replace(/首先|其次|再者|综上所述|值得注意的是|从某种程度上/g, '')
+             .replace(/记者|编辑|业内人士/g, '')
+             .replace(/\n{3,}/g, '\n\n')
+             .trim();
 }
 
 async function startNews(){
@@ -284,39 +354,43 @@ async function startNews(){
   const resultsDiv = document.getElementById('newsResults');
   if(!resultsDiv) return;
 
-  resultsDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 抓取中...</div>';
+  resultsDiv.innerHTML = '<div class="loading"><span class="spinner"></span> 抓取热点事件中...</div>';
 
   try{
-    let news = await fetchNews(topic, kw, 10); 
-	news = cleanNewsData(news);
-	
-    // ✅ 双重兜底（关键）
-    if(!news || news.length === 0){
-      news = getFallbackNews(topic, kw);
-    }
-
-    // ✅ 再保险（极端情况）
-    if(!news || news.length === 0){
-      news = [{
-        title: '暂无可用新闻',
-        summary: '当前接口异常，请稍后再试',
-        source: '系统'
+    // 获取数据（新版API返回 { events: [...] }）
+    const data = await fetchNews(topic, kw, 10);
+    
+    // 提取事件数组
+    let events = data.events || [];
+    
+    // 兜底：如果没有事件，生成一个默认事件
+    if(!events || events.length === 0){
+      events = [{
+        event: `暂无“${kw || topic}”相关热点`,
+        heat: 0,
+        count: 0,
+        articles: [{ title: '请尝试其他关键词', summary: '系统正在持续更新中', source: '系统' }]
       }];
     }
 
-    newsCache = news;
-    fullArticles = {};
-    shepingCache = {};
+    // 缓存事件（供后续生成文章使用）
+    window.eventCache = events;
 
-    await renderAll(news, kw || topic);
+    // 渲染事件（新版 renderAllEvents 函数）
+    await renderAllEvents(events, kw || topic);
 
   }catch(e){
     console.error(e);
 
-    // ✅ 永不空白
-    const news = getFallbackNews(topic, kw);
-    newsCache = news;
-    await renderAll(news, kw || topic);
+    // 降级兜底
+    const fallbackEvents = [{
+      event: `热点加载中，请稍后重试`,
+      heat: 0,
+      count: 1,
+      articles: [{ title: '网络异常或暂无数据', summary: '请刷新页面或稍后再试', source: '系统' }]
+    }];
+    window.eventCache = fallbackEvents;
+    await renderAllEvents(fallbackEvents, kw || topic);
   }
 }
 
